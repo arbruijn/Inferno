@@ -26,7 +26,7 @@ namespace Inferno {
         Vector3 Target = Vector3::Zero;
         Vector3 Up = Vector3::UnitY;
 
-        const float MinimumZoom = 10; // closest the camera can get to the target
+        const float MinimumZoom = 5; // closest the camera can get to the target
         Viewport Viewport = { 0, 0, 1024, 768, NearClip, FarClip };
 
         void SetViewport(float width, float height) {
