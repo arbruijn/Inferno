@@ -36,9 +36,12 @@ namespace Inferno::Editor {
     };
 
     void CreateTunnel(Level& level, PointTag start, PointTag end, int steps, float startLength, float endLength);
+    void ClearTunnel();
+    void CreateTunnelSegments(Level& level, TunnelPath& path, PointTag start, PointTag end);
 
     inline List<Vector3> TunnelBuilderPath;
     inline List<Vector3> TunnelBuilderPoints;
+    inline List<SegID> TunnelBuilderSegments;
     inline List<Vector3> DebugTunnelPoints;
     inline TunnelPath DebugTunnel;
 

@@ -64,18 +64,31 @@ namespace Inferno::Editor {
                 RefreshTunnel();
             }
 
-            ImGui::Dummy({ 0, 5 });
-            ImGui::Separator();
-            ImGui::Dummy({ 0, 5 });
 
             if (ImGui::InputInt("Steps", &_steps, 1, 10)) {
                 _steps = std::clamp(_steps, 1, 50);
                 RefreshTunnel();
             }
+
+            ImGui::Dummy({ 0, 5 });
+            ImGui::Separator();
+            ImGui::Dummy({ 0, 5 });
+
+            if (ImGui::Button("Generate", { 100, 0 })) {
+                GenerateTunnel();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Clear", { 100, 0 })) {
+                ClearTunnel();
+            }
         }
 
         void RefreshTunnel() {
             CreateTunnel(Game::Level, _start, _end, _steps, _startLength, _endLength);
+        }
+
+        void GenerateTunnel() {
+            CreateTunnelSegments(Game::Level, DebugTunnel, _start, _end);
         }
 
         void UpdateInitialLengths() {

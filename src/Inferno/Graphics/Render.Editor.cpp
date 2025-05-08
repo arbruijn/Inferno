@@ -93,8 +93,10 @@ namespace Inferno::Render {
 
         for (int i = 4; i < Editor::TunnelBuilderPoints.size(); i++) {
             auto& p0 = Editor::TunnelBuilderPoints[i - 4];
+            auto& p0_0 = Editor::TunnelBuilderPoints[i - (i % 4) + (i + 3) % 4];
             auto& p1 = Editor::TunnelBuilderPoints[i];
             Debug::DrawLine(p0, p1, Colors::Hostage);
+            Debug::DrawLine(p0_0, p1, Colors::Hostage);
         }
 
         for (auto& node : Editor::DebugTunnel.Nodes) {

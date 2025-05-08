@@ -1,6 +1,11 @@
 #include "pch.h"
 #include "TunnelBuilder.h"
 #include "Face.h"
+#include "Editor.Segment.h"
+#include "Editor.Selection.h"
+#include "Events.h"
+#include "Resources.h"
+#include "FmtTypes.h"
 
 namespace Inferno::Editor {
     constexpr long Factorial(const int n) {
@@ -221,6 +226,10 @@ namespace Inferno::Editor {
         nodes[0].Rotation = start.Rotation;
         nodes[steps].Rotation = end.Rotation;
         nodes[0].Axis = start.Rotation.Right();
+        SPDLOG_INFO("nodes0 rotation {}", nodes[0].Rotation);
+        SPDLOG_INFO("nodes0 v {}", nodes[0].Vertex);
+        SPDLOG_INFO("nodes-1 rotation {}", nodes[steps].Rotation);
+        SPDLOG_INFO("nodes-1 v {}", nodes[steps].Vertex);
 
         auto deltaAngle = TotalTwist(start, end);
         auto totalLength = PathLength(nodes, steps);
@@ -280,8 +289,10 @@ namespace Inferno::Editor {
             }
         }
 
-        for (int i = 0; i <= steps; i++)
-            nodes[i].Rotation = nodes[i].Rotation.Invert();
+        //for (int i = 0; i <= steps; i++)
+        //    nodes[i].Rotation = nodes[i].Rotation.Invert();
+        SPDLOG_INFO("nodes0 rotation {}", nodes[0].Rotation);
+        SPDLOG_INFO("nodes-1 rotation {}", nodes[steps].Rotation);
 
         return path;
     }
@@ -333,6 +344,91 @@ namespace Inferno::Editor {
         }
     }
 
+    void CreateTunnelSegments(Level& level, TunnelPath& path, PointTag start, PointTag end) {
+        if (!TunnelBuilderSegments.empty()) {
+            DeleteSegments(level, TunnelBuilderSegments);
+            TunnelBuilderSegments.clear();
+        }
+        Tag last = start;
+        auto startIndices = level.GetSegment(start).GetVertexIndices(start.Side);
+        SPDLOG_INFO("nodes {}", path.Nodes.size());
+        Marked.Segments.clear();
+        for (auto& node : path.Nodes | std::views::drop(1)) {
+            SPDLOG_INFO("last {}, {}", last.Segment, last.Side);
+            auto& lastSeg = level.GetSegment(last);
+            auto& lastSide = lastSeg.GetSide(last.Side);
+            Vector3 normal = lastSide.AverageNormal * 20;
+
+            //SPDLOG_INFO("normal {}, {}, {}", normal.x, normal.y, normal.z);
+
+            auto vertIndex = (uint16)level.Vertices.size(); // take index before adding new points
+
+            auto srcIndices = lastSeg.GetVertexIndices(last.Side);
+            //for (auto& idx : srcIndices) {
+            for (auto& idx : startIndices) {
+            //for (int i = 0; i < 4; i++) {
+                //level.Vertices.push_back(level.Vertices[idx] - srcSide.AverageNormal * length);
+                auto v = level.Vertices[idx] - path.Nodes[0].Vertex;
+                v = Vector3::Transform(v, path.Nodes[0].Rotation.Invert());
+                v = Vector3::Transform(v, node.Rotation);
+                v += node.Vertex;
+                level.Vertices.push_back(v);
+            }
+
+            Segment seg = {};
+            SegID id = (SegID)level.Segments.size();
+
+            auto oppositeSide = (int)GetOppositeSide(last.Side);
+            seg.Connections[oppositeSide] = last.Segment;
+            lastSeg.Connections[(int)last.Side] = id;
+
+            auto& srcVertIndices = SideIndices[oppositeSide];
+            auto& destSideIndices = SideIndices[(int)last.Side];
+            seg.Indices[srcVertIndices[3]] = srcIndices[0];
+            seg.Indices[srcVertIndices[2]] = srcIndices[1];
+            seg.Indices[srcVertIndices[1]] = srcIndices[2];
+            seg.Indices[srcVertIndices[0]] = srcIndices[3];
+
+            seg.Indices[destSideIndices[0]] = vertIndex + 0;
+            seg.Indices[destSideIndices[1]] = vertIndex + 1;
+            seg.Indices[destSideIndices[2]] = vertIndex + 2;
+            seg.Indices[destSideIndices[3]] = vertIndex + 3;
+
+            // copy textures
+            for (int i = 0; i < 6; i++) {
+                auto& side = seg.Sides[i];
+                side.TMap = lastSeg.Sides[i].TMap;
+                side.TMap2 = lastSeg.Sides[i].TMap2;
+                side.OverlayRotation = lastSeg.Sides[i].OverlayRotation;
+                //side.UVs = lastSeg.Sides[i].UVs;
+
+                // Clear door textures
+                if (Resources::GetWallClipID(side.TMap) != WClipID::None)
+                    side.TMap = LevelTexID::Unset;
+
+                if (Resources::GetWallClipID(side.TMap2) != WClipID::None)
+                    side.TMap2 = LevelTexID::Unset;
+            }
+
+            seg.UpdateGeometricProps(level);
+
+            level.Segments.push_back(seg);
+            TunnelBuilderSegments.push_back(id);
+            last.Segment = id;
+            Marked.Segments.insert(id);
+            SPDLOG_INFO("added seg {}", id);
+        }
+        Events::SegmentsChanged();
+        Events::LevelChanged();
+    }
+
+    void ClearTunnel() {
+        TunnelBuilderPath.clear();
+        TunnelBuilderPoints.clear();
+        DebugTunnelPoints.clear();
+        DebugTunnel.Nodes.clear();
+    }
+
     void CreateTunnel(Level& level, PointTag start, PointTag end, int steps, float startLength, float endLength) {
         if (!level.SegmentExists(start) || !level.SegmentExists(end))
             return;
@@ -348,6 +444,7 @@ namespace Inferno::Editor {
 
         auto startNode = CreateNode(level, start, -1);
         auto endNode = CreateNode(level, end, 1);
+        SPDLOG_INFO("start rotation {}", startNode.Rotation);
         auto path = CreatePath(startNode, endNode, steps, startLength, endLength);
         //path.StartVertices = startNode.Vertices; 
         auto startVertices = startNode.Vertices; // should be verts of all selected faces, not just the first
@@ -395,6 +492,7 @@ namespace Inferno::Editor {
                 //    }
             }
         }
+        SPDLOG_INFO("v end {}; {}; {}; {}", endNode.Vertices[0], endNode.Vertices[1], endNode.Vertices[2], endNode.Vertices[3]);
 
         // Compute all tunnel vertices by rotating the base vertices using each path node's orientation (== rotation matrix)
         // The rotation is relative to the base coordinate system (identity matrix), but the vertices are relative to the 
@@ -402,14 +500,26 @@ namespace Inferno::Editor {
         // it with the current path node's orientation matrix and position.
         List<Vector3> vertices;
 
+        SPDLOG_INFO("morph {},{},{} {},{},{} {},{},{} {},{},{}",
+            vMorph[0].x, vMorph[0].y, vMorph[0].z,
+            vMorph[1].x, vMorph[1].y, vMorph[1].z,
+            vMorph[2].x, vMorph[2].y, vMorph[2].z,
+            vMorph[3].x, vMorph[3].y, vMorph[3].z);
+
+        SPDLOG_INFO("nodes0 rotation {}", path.Nodes[0].Rotation);
+        SPDLOG_INFO("nodes-1 rotation {}", path.Nodes[steps].Rotation);
         for (int nSegment = 0; nSegment <= steps; nSegment++) {
             Matrix rotation = path.Nodes[nSegment].Rotation.Invert();
             auto& translation = path.Nodes[nSegment].Vertex;
 
             for (uint nVertex = 0; nVertex < startVertices.size(); nVertex++) {
+                bool log = (!nSegment || nSegment == steps) && !nVertex;
                 Vector3 v = startVertices[nVertex];
+                if (log) SPDLOG_INFO("v org {}", v);
                 v -= startNode.Point; // un-translate (make relative to tunnel start)
-                v = Vector3::Transform(v, startNode.Rotation); // un-rotate
+                if (log) SPDLOG_INFO("v untr {}", v);
+                v = Vector3::Transform(v, startNode.Rotation.Transpose()); // un-rotate
+                if (log) SPDLOG_INFO("v unrot {}", v);
 
                 if (morph) {
                     float amount = (float)nSegment / (float)steps;
@@ -417,14 +527,20 @@ namespace Inferno::Editor {
                     v += vMorph[nVertex] * amount;
                 }
 
-                v = Vector3::Transform(v, rotation);
+                if (log) SPDLOG_INFO("v m {}", v);
+                v = Vector3::Transform(v, rotation.Transpose());
+                if (log) SPDLOG_INFO("v rot {}", v);
                 v += translation;
+                if (log) SPDLOG_INFO("v tr {}", v);
                 vertices.push_back(v);
                 TunnelBuilderPoints.push_back(v);
             }
         }
 
+
         CreateDebugPath(path);
         DebugTunnel = path;
+
+        //CreateTunnelSegments(level, path, start, end);
     }
 }
