@@ -57,6 +57,8 @@ namespace Inferno::Resources {
     void LoadLevel(Level&);
 
     const PigBitmap& ReadBitmap(TexID);
+    const string& TextureName(TexID id);
+    bool HasTextureNames();
 
     inline HamFile GameData = {};
 

@@ -446,6 +446,21 @@ namespace Inferno::Resources {
         return Textures[(int)id];
     }
 
+    /*
+    const string& TextureName(TexID id) {
+        static string none = "";
+        if (TextureNames.empty())
+            return none;
+
+        if (!Seq::inRange(TextureNames, (int)id)) id = (TexID)0;
+        return TextureNames[(int)id];
+    }
+
+    bool HasTextureNames() {
+        return !TextureNames.empty();
+    }
+    */
+
     List<ubyte> ReadFile(string file) {
         // Search mounted mission first
         if (Game::Mission && Game::Mission->Exists(file))

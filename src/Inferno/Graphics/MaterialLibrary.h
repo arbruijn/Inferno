@@ -49,6 +49,7 @@ namespace Inferno::Render {
         Material2D White, Black;
 
         void LoadMaterials(span<const TexID> ids, bool forceLoad);
+        void LoadNamedMaterials(span<const TexID> ids, bool forceLoad);
         void LoadMaterialsAsync(span<const TexID> ids, bool forceLoad = false);
         void Dispatch();
 
@@ -93,6 +94,18 @@ namespace Inferno::Render {
             for (auto& id : tids) {
                 if (id <= TexID::Invalid) continue;
                 if (_materials[(int)id].ID == id) continue;
+                hasPending = true;
+                break;
+            }
+
+            return hasPending;
+        }
+
+        bool HasUnloadedNamedTextures(span<const TexID> tids) {
+            bool hasPending = false;
+            for (auto& id : tids) {
+                if (id <= TexID::Invalid) continue;
+                if (_outrageMaterials.contains(Resources::TextureName(id))) continue;
                 hasPending = true;
                 break;
             }

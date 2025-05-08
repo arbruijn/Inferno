@@ -290,6 +290,15 @@ namespace Inferno::Render {
     }
 
     void MaterialLibrary::LoadMaterials(span<const TexID> tids, bool forceLoad) {
+        /*
+        SPDLOG_INFO("LoadMaterials HasTextureNames {}", Resources::HasTextureNames());
+
+        if (Resources::HasTextureNames()) {
+            LoadNamedMaterials(tids, forceLoad);
+            return;
+        }
+        */
+
         // Pre-scan materials, as starting an upload batch causes a stall
         if (!forceLoad && !HasUnloadedTextures(tids)) return;
 
@@ -314,6 +323,50 @@ namespace Inferno::Render {
         Render::Adapter->PrintMemoryUsage();
         Render::Heaps->Shader.GetFreeDescriptors();
     }
+
+    #if 0
+    void MaterialLibrary::LoadNamedMaterials(span<const TexID> tids, bool forceLoad) {
+           SPDLOG_INFO("LoadNamedMaterials {} force {} hasUnloaded {}", tids.size(), forceLoad,
+               HasUnloadedTextures(tids));
+
+        // Pre-scan materials, as starting an upload batch causes a stall
+        if (!forceLoad && !HasUnloadedTextures(tids)) return;
+
+        List<Material2D> uploads;
+        auto batch = BeginTextureUpload();
+
+        for (auto& id : tids) {
+            string texture = Resources::TextureName(id);
+            SPDLOG_INFO("texture {} -> {}", id, texture);
+            //if (_outrageMaterials.contains(texture)) continue; // skip loaded
+            if (_materials[(int)id].ID == id) continue;
+
+            MaterialUpload upload;
+            if (auto bitmap = Resources::ReadOutrageBitmap(texture + ".ogf")) {
+                if (auto material = UploadOutrageMaterial(batch, *bitmap, _black)) {
+                    material->Name = texture; // Name in the model can be different than file name
+                    material->ID = id;
+                    uploads.emplace_back(std::move(material.value()));
+                }
+                else
+                    SPDLOG_INFO("Failed to upload {}", texture);
+            }
+            else
+                SPDLOG_INFO("Failed to read {}", texture);
+        }
+
+        SPDLOG_INFO("Loading {} textures", uploads.size());
+        EndTextureUpload(batch);
+
+        for (auto& upload : uploads) {
+            //_outrageMaterials[upload.Name] = std::move(upload);
+            _materials[(int)upload.ID] = std::move(upload);
+        }
+
+        Render::Adapter->PrintMemoryUsage();
+        Render::Heaps->Shader.GetFreeDescriptors();
+    }
+    #endif
 
     void MaterialLibrary::LoadMaterialsAsync(span<const TexID> tids, bool forceLoad) {
         if (!forceLoad && !HasUnloadedTextures(tids)) return;
