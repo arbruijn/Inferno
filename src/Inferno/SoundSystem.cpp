@@ -138,6 +138,7 @@ namespace Inferno::Sound {
         }
         catch (const std::exception& e) {
             SPDLOG_ERROR("Unable to start sound engine: {}", e.what());
+            CoUninitialize();
             return;
         }
 
@@ -236,9 +237,10 @@ namespace Inferno::Sound {
     }
 
     void Shutdown() {
-        if (!Alive) return;
-        Alive = false;
-        Engine->Suspend();
+        if (Alive) {
+            Alive = false;
+            Engine->Suspend();
+        }
         WorkerThread.join();
     }
 
