@@ -104,8 +104,13 @@ namespace Inferno::Editor {
 
             case ObjectType::Robot:
             {
-                auto& ri = Resources::GetRobotInfo(obj.ID);
-                return Resources::GetModel(ri.Model).Radius;
+                if (obj.IsGeneric) {
+                    auto& info = Resources::GameTable.Generics.at(obj.ID);
+                    return info.Size;
+                } else {
+                    auto& ri = Resources::GetRobotInfo(obj.ID);
+                    return Resources::GetModel(ri.Model).Radius;
+                }
             }
 
             case ObjectType::Hostage:
@@ -113,8 +118,13 @@ namespace Inferno::Editor {
 
             case ObjectType::Powerup:
             {
-                auto& info = Resources::GameData.Powerups.at(obj.ID);
-                return info.Size;
+                if (obj.IsGeneric) {
+                    auto& info = Resources::GameTable.Generics.at(obj.ID);
+                    return info.Size;
+                } else {
+                    auto& info = Resources::GameData.Powerups.at(obj.ID);
+                    return info.Size;
+                }
             }
 
             case ObjectType::Reactor:

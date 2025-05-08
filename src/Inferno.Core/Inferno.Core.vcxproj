@@ -132,6 +132,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Briefing.cpp" />
+    <ClCompile Include="D3Level.cpp" />
+    <ClCompile Include="D3LevelReader.cpp" />
     <ClCompile Include="Fonts.cpp" />
     <ClCompile Include="HamFile.cpp" />
     <ClCompile Include="HogFile.cpp" />

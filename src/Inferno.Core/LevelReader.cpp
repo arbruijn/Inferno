@@ -3,6 +3,8 @@
 #include "Streams.h"
 #include "Utility.h"
 #include "Pig.h"
+#include "D3LevelReader.h"
+#include "OutrageTable.h"
 
 namespace Inferno {
     void ReadLevelInfo(StreamReader& reader, Level& level) {
@@ -542,8 +544,13 @@ namespace Inferno {
         }
     };
 
-    Level Level::Deserialize(span<ubyte> data) {
-        LevelReader reader(data);
-        return reader.Read();
+    Level Level::Deserialize(span<ubyte> data, const Outrage::GameTable& table) {
+        if (data[0] == 'D' && data[1] == '3') {
+            D3LevelReader reader(data);
+            return reader.Read(table);
+        } else {
+            LevelReader reader(data);
+            return reader.Read();
+        }
     }
 }

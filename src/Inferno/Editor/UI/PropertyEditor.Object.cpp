@@ -99,7 +99,7 @@ namespace Inferno::Editor {
     }
 
     struct PowerupSort {
-        int8 ID;
+        int ID;
         const Powerup* Ptr;
         string Name;
     };
@@ -109,7 +109,7 @@ namespace Inferno::Editor {
         List<PowerupSort> sorted;
         sorted.reserve(powerupCount);
 
-        for (int8 i = 0; i < powerupCount; i++) {
+        for (int i = 0; i < powerupCount; i++) {
             if (auto name = Resources::GetPowerupName(i)) {
                 sorted.push_back({ i, &Resources::GameData.Powerups[i], *name });
             }
@@ -128,7 +128,7 @@ namespace Inferno::Editor {
         return sorted;
     }
 
-    bool PowerupDropdown(const char* label, int8& id, VClipID* vclipID = nullptr) {
+    bool PowerupDropdown(const char* label, int& id, VClipID* vclipID = nullptr) {
         auto name = Resources::GetPowerupName(id);
         auto preview = name.value_or("Unknown");
         bool changed = false;
@@ -250,14 +250,14 @@ namespace Inferno::Editor {
         return changed;
     }
 
-    struct RobotSort { int8 ID; string Name; };
+    struct RobotSort { int ID; string Name; };
 
     List<RobotSort> SortRobots() {
         auto robotCount = Game::Level.IsDescent1() ? 24 : Resources::GameData.Robots.size();
         List<RobotSort> sorted;
         sorted.reserve(robotCount);
 
-        for (int8 i = 0; i < robotCount; i++) {
+        for (int i = 0; i < robotCount; i++) {
             sorted.push_back({ i, Resources::GetRobotName(i) });
         }
 
@@ -270,13 +270,13 @@ namespace Inferno::Editor {
         return sorted;
     }
 
-    bool RobotDropdown(const char* label, int8& id) {
+    bool RobotDropdown(const char* label, int& id) {
         bool changed = false;
 
         if (ImGui::BeginCombo(label, Resources::GetRobotName(id).c_str(), ImGuiComboFlags_HeightLarge)) {
             auto sorted = SortRobots();
 
-            for (int8 i = 0; i < sorted.size(); i++) {
+            for (int i = 0; i < sorted.size(); i++) {
                 const bool isSelected = id == sorted[i].ID;
                 if (ImGui::Selectable(sorted[i].Name.c_str(), isSelected)) {
                     id = sorted[i].ID;
@@ -423,7 +423,7 @@ namespace Inferno::Editor {
         auto idStr = std::to_string(obj.ID);
         ImGui::SetNextItemWidth(-1);
         if (ImGui::BeginCombo("##reactor", idStr.c_str())) {
-            for (int8 i = 0; i < Resources::GameData.Reactors.size(); i++) {
+            for (int i = 0; i < Resources::GameData.Reactors.size(); i++) {
                 const bool isSelected = obj.ID == i;
                 auto iStr = std::to_string(i);
                 if (ImGui::Selectable(iStr.c_str(), isSelected)) {

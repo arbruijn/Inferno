@@ -144,6 +144,10 @@ namespace Inferno {
             commandList->SetGraphicsRootDescriptorTable(Material1, material.Handles[0]);
         }
 
+        void SetMaterial1(ID3D12GraphicsCommandList* commandList, D3D12_GPU_DESCRIPTOR_HANDLE handle) {
+            commandList->SetGraphicsRootDescriptorTable(Material1, handle);
+        }
+
         void SetMaterial2(ID3D12GraphicsCommandList* commandList, const Material2D& material) {
             commandList->SetGraphicsRootDescriptorTable(Material2, material.Handles[0]);
         }

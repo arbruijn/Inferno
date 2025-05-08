@@ -136,5 +136,11 @@
     <ClCompile Include="Briefing.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="D3Level.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D3LevelReader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

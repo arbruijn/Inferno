@@ -78,7 +78,7 @@ namespace Inferno::Render {
         Set<TexID> ids;
 
         for (auto& seg : level.Segments) {
-            for (auto& sideId : SideIDs) {
+            for (SideID sideId = (SideID)0; (int)sideId < seg.Sides.size(); sideId = SideID((int)sideId + 1)) {
                 auto& side = seg.GetSide(sideId);
                 if (!seg.SideHasConnection(sideId) || seg.SideIsWall(sideId)) {
                     ids.insert(Resources::LookupLevelTexID(side.TMap));

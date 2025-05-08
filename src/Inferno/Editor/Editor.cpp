@@ -445,9 +445,15 @@ namespace Inferno::Editor {
 
             if (obj.Type == ObjectType::Robot) {
                 auto& physics = obj.Movement.Physics;
-                auto& robot = Resources::GameData.Robots[obj.ID];
-                physics.Mass = robot.Mass;
-                physics.Drag = robot.Drag;
+                if (level.IsDescent3()) {
+                    auto& gen = Resources::GameTable.Generics[obj.ID];
+                    physics.Mass = gen.Physics.Mass;
+                    physics.Drag = gen.Physics.Drag;
+                } else {
+                    auto& robot = Resources::GameData.Robots[obj.ID];
+                    physics.Mass = robot.Mass;
+                    physics.Drag = robot.Drag;
+                }
             }
         }
     }

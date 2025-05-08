@@ -80,7 +80,7 @@ namespace Inferno::Editor {
         if (!file.read((char*)buffer.data(), size))
             throw Exception("Error reading file");
 
-        auto level = Level::Deserialize(buffer);
+        auto level = Level::Deserialize(buffer, Resources::GameTable);
         level.FileName = path.filename().string();
         level.Path = path;
 
@@ -110,6 +110,9 @@ namespace Inferno::Editor {
         auto sig = (uint)reader.ReadInt32();
         if (sig == MakeFourCC("LVLP")) {
             return reader.ReadInt32(); // Level version
+        }
+        if (sig == MakeFourCC("D3LV")) {
+            return -2; // D3 Level
         }
 
         return -1;
@@ -205,7 +208,7 @@ namespace Inferno::Editor {
     void LoadFile(filesystem::path path) {
         try {
             auto version = FileVersionFromHeader(path);
-            if (version > 0 && version <= 8) { // D1 to Vertigo level (no XL)
+            if (version > 0 && version <= 8 || version == -2) { // D1 to Vertigo level (no XL)
                 LoadLevel(path);
             }
             else if (version == 0) { // Hog file
@@ -501,9 +504,9 @@ namespace Inferno::Editor {
                 if (!CanCloseCurrentFile()) return;
 
                 static const COMDLG_FILTERSPEC filter[] = {
-                    { L"Descent Levels", L"*.hog;*.rl2;*.rdl" },
+                    { L"Descent Levels", L"*.hog;*.rl2;*.rdl;*.d3l" },
                     { L"Missions", L"*.hog" },
-                    { L"Levels", L"*.rl2;*.rdl" },
+                    { L"Levels", L"*.rl2;*.rdl;*.d3l" },
                     { L"All Files", L"*.*" }
                 };
 

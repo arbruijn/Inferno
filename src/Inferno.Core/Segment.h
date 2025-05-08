@@ -18,11 +18,12 @@ namespace Inferno {
         Array<Vector3, 2> Centers;
         Vector3 AverageNormal;
         Vector3 Center;
+        List<int16> Indices{};
 
         LevelTexID TMap, TMap2{};
         OverlayRotation OverlayRotation = OverlayRotation::Rotate0;
-        Array<Vector2, 4> UVs = { Vector2(0, 0), Vector2(0, 1), Vector2(1, 1), Vector2(1, 0) };
-        Array<Color, 4> Light = { Color(1,1,1), Color(1,1,1), Color(1,1,1), Color(1,1,1) };
+        List<Vector2> UVs = { Vector2(0, 0), Vector2(0, 1), Vector2(1, 1), Vector2(1, 0) };
+        List<Color> Light = List<Color>(4, Color(1,1,1)); //{ Color(1,1,1), Color(1,1,1), Color(1,1,1), Color(1,1,1) };
         Array<bool, 4> LockLight = { false, false, false, false }; // Locks light values from being updated from the light algorithm
 
         Option<Color> LightOverride; // Editor defined override for amount of light emitted
@@ -45,9 +46,25 @@ namespace Inferno {
             }
         }
 
-        const Array<uint16, 6> GetRenderIndices() const {
-            static const Array<uint16, 6> tri02 = { 0u, 1u, 2u, 0u, 2u, 3u };
-            static const Array<uint16, 6> tri13 = { 0u, 1u, 3u, 3u, 1u, 2u };
+        const List<uint16> GetRenderIndices() const {
+            static const List<uint16> tri = { 0u, 1u, 2u };
+            static const List<uint16> tri02 = { 0u, 1u, 2u, 0u, 2u, 3u };
+            static const List<uint16> tri13 = { 0u, 1u, 3u, 3u, 1u, 2u };
+            uint16 n = (uint16)Indices.size();
+            if (n) {
+                if (n == 3)
+                    return tri;
+                if (n != 4) {
+                    List<uint16> indices;
+                    indices.reserve((n - 2) * 3);
+                    for (uint16 i = 1; i < n - 1; i++) {
+                        indices.push_back(0);
+                        indices.push_back(i);
+                        indices.push_back(i + 1);
+                    }
+                    return indices;
+                }
+            }
             return Type == SideSplitType::Tri13 ? tri13 : tri02;
         }
 
@@ -122,9 +139,10 @@ namespace Inferno {
     struct Level;
 
     struct Segment {
-        Array<SegID, MAX_SIDES> Connections = { SegID::None, SegID::None, SegID::None, SegID::None, SegID::None, SegID::None };
-        Array<SegmentSide, MAX_SIDES> Sides{};
-        Array<PointID, MAX_VERTICES> Indices{}; // index into the global vertex buffer
+        List<SegID> Connections = List<SegID>(MAX_SIDES, SegID::None);
+        //{ SegID::None, SegID::None, SegID::None, SegID::None, SegID::None, SegID::None };
+        List<SegmentSide> Sides = List<SegmentSide>(MAX_SIDES);
+        List<PointID> Indices = List<PointID>(MAX_VERTICES); // index into the global vertex buffer
         SegmentType Type = SegmentType::None; // What type of center this is
         MatcenID Matcen = MatcenID::None; // Which center segment is associated
         ubyte StationIndex{};
@@ -176,12 +194,38 @@ namespace Inferno {
 
         // Vertex indices for a side in the vertex buffer
         Array<PointID, 4> GetVertexIndices(SideID side) const {
-            Array<PointID, 4> indices{};
-            auto& sideVerts = Inferno::SideIndices[(int)side];
-            for (int i = 0; i < indices.size(); i++)
-                indices[i] = Indices[sideVerts[i]];
-
+            Array<PointID, 4> indices;
+            auto& s = GetSide(side);
+            if (s.Indices.size()) {
+                int n = (int)s.Indices.size();
+                if (n > 4)
+                     n = 4;
+                for (int i = 0; i < n; i++)
+                    indices[i] = Indices[s.Indices[i]];
+                if (n == 3)
+                    indices[3] = indices[0];
+            } else {
+                auto& sideVerts = Inferno::SideIndices[(int)side];
+                for (int i = 0; i < indices.size(); i++)
+                   indices[i] = Indices[sideVerts[i]];
+            }
             return indices;
+        }
+
+        List<PointID> GetVertexIndicesAll(SideID side) const {
+            auto& s = GetSide(side);
+            if (s.Indices.size()) {
+                List<PointID> indices(s.Indices.size());
+                for (int i = 0; i < s.Indices.size(); i++)
+                    indices[i] = Indices[s.Indices[i]];
+                return indices;
+            } else {
+                List<PointID> indices(4);
+                auto& sideVerts = Inferno::SideIndices[(int)side];
+                for (int i = 0; i < indices.size(); i++)
+                   indices[i] = Indices[sideVerts[i]];
+                return indices;
+            }
         }
 
         Array<PointID*, 4> GetVertexIndicesRef(SideID side) {

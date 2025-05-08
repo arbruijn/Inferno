@@ -150,6 +150,8 @@ namespace Inferno::Resources {
 
     TexID LookupLevelTexID(LevelTexID tid) {
         auto id = (int)tid;
+        if (Game::Level.IsDescent3())
+            return TexID((int)tid);
         if (!Seq::inRange(GameData.AllTexIdx, id)) return TexID::None;
         return TexID((int)GameData.AllTexIdx[id]);
     }
@@ -287,6 +289,29 @@ namespace Inferno::Resources {
         }
     }
 
+    void LoadDescent3Resources(Level& level) {
+        //std::scoped_lock lock(PigMutex);
+        SPDLOG_INFO("Loading Descent 3 level: '{}'\r\n Version: {} Segments: {} Vertices: {}", level.Name, level.Version, level.Segments.size(), level.Vertices.size());
+
+        // Everything loaded okay, set the internal data
+        //LevelPalette = std::move(palette);
+        //Pig = std::move(pig);
+        //Hog = std::move(hog);
+        //GameData = std::move(ham);
+        //Textures = std::move(textures);
+
+           auto& textures = Resources::GameTable.Textures;
+           level.TextureHandles.resize(textures.size());
+           fill(level.TextureHandles.begin(), level.TextureHandles.end(), -1);
+           Set<LevelTexID> used;
+           for (auto& seg : level.Segments)
+               for (auto& side : seg.Sides)
+                   used.insert(side.TMap);
+           for (auto texId : used)
+               level.TextureHandles[(int)texId] = Render::NewTextureCache->Resolve(textures[(int)texId].Name);
+           SPDLOG_INFO("TextureHandles {}/{}", used.size(), level.TextureHandles.size());
+    }
+
     void LoadSounds() {
         if (FoundDescent1()) {
             try {
@@ -420,6 +445,9 @@ namespace Inferno::Resources {
             else if (level.IsDescent1()) {
                 LoadDescent1Resources(level);
             }
+            else if (level.IsDescent3()) {
+                LoadDescent3Resources(level);
+            }
             else {
                 throw Exception("Unsupported level version");
             }
@@ -477,7 +505,7 @@ namespace Inferno::Resources {
     Level ReadLevel(string name) {
         SPDLOG_INFO("Reading level {}", name);
         auto data = ReadFile(name);
-        auto level = Level::Deserialize(data);
+        auto level = Level::Deserialize(data, Resources::GameTable);
         level.FileName = name;
         return level;
     }
@@ -527,6 +555,8 @@ namespace Inferno::Resources {
 
                 LoadVClips();
             }
+            else
+                SPDLOG_INFO("d3.hog not found");
 
             //if (auto path = FileSystem::TryFindFile("merc.hog")) {
             //    Mercenary = Hog2::Read(*path);
@@ -564,6 +594,8 @@ namespace Inferno::Resources {
             OutrageModels[name] = std::move(*model);
             return &OutrageModels[name];
         }
+
+        SPDLOG_INFO("Failed to read outrage model {}", name);
 
         return nullptr;
     }

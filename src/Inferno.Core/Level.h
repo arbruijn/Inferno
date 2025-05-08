@@ -8,6 +8,7 @@
 #include "Wall.h"
 #include "DataPool.h"
 #include "Segment.h"
+#include "OutrageTable.h"
 
 namespace Inferno {
     struct Matcen {
@@ -116,6 +117,7 @@ namespace Inferno {
         List<Trigger> Triggers;
         List<Matcen> Matcens;
         List<FlickeringLight> FlickeringLights; // Vertigo flickering lights
+        List<int> TextureHandles;
 
         // Reactor stuff
         int BaseReactorCountdown = 30;
@@ -161,6 +163,7 @@ namespace Inferno {
         bool IsDescent2NoVertigo() const { return Version > 1 && Version <= 7; }
         // D2 level vertigo enhanced
         bool IsVertigo() const { return Version == 8; }
+        bool IsDescent3() const { return Version == -2; }
 
         bool HasSecretExit() const;
 
@@ -444,6 +447,6 @@ namespace Inferno {
         bool CanAddMatcen() { return Matcens.size() < Limits.Matcens; }
 
         size_t Serialize(StreamWriter& writer);
-        static Level Deserialize(span<ubyte>);
+        static Level Deserialize(span<ubyte>, const Outrage::GameTable& table);
     };
 }

@@ -10,6 +10,7 @@ namespace Inferno {
     struct LevelChunk {
         List<uint16> Indices; // Indices into the LevelGeometry buffer (NOT level vertices)
         LevelTexID TMap1, TMap2;
+        int TMap1Handle = -1;
         uint ID = 0;
         EClipID EffectClip1 = EClipID::None;
         EClipID EffectClip2 = EClipID::None;

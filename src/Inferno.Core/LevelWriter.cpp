@@ -208,13 +208,19 @@ namespace Inferno {
                         writer.Write(tmap2);
                     }
 
-                    for (int i = 0; i < 4; i++) {
+                    int n = side.UVs.size() == 3 ? 3 : 4;
+                    for (int i = 0; i < n; i++) {
                         auto u = FloatToFix(side.UVs[i].x);
                         auto v = FloatToFix(side.UVs[i].y);
                         auto l = FloatToFix(Desaturate(side.Light[i]));
                         writer.Write((int16)(u >> 5));
                         writer.Write((int16)(v >> 5));
                         writer.Write((int16)(l >> 1));
+                    }
+                    if (n == 3) {
+                        writer.Write((int16)0);
+                        writer.Write((int16)0);
+                        writer.Write((int16)0);
                     }
                 }
             }

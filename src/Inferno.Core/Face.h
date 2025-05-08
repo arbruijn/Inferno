@@ -12,9 +12,9 @@ namespace Inferno {
     struct Face {
         Vector3& P0, & P1, & P2, & P3;
         SegmentSide& Side;
-        Array<PointID, 4> Indices;
+        List<PointID> Indices;
 
-        Face(Vector3& p0, Vector3& p1, Vector3& p2, Vector3& p3, SegmentSide& side, Array<PointID, 4> indices) :
+        Face(Vector3& p0, Vector3& p1, Vector3& p2, Vector3& p3, SegmentSide& side, List<PointID> indices) :
             P0(p0), P1(p1), P2(p2), P3(p3), Side(side), Indices(indices) {
         }
 
@@ -28,18 +28,19 @@ namespace Inferno {
         }
 
         static Face FromSide(Level& level, Segment& seg, SideID side) {
-            auto& sideVerts = SideIndices[(int)side];
-            auto& v0 = level.Vertices[seg.Indices[sideVerts[0]]];
-            auto& v1 = level.Vertices[seg.Indices[sideVerts[1]]];
-            auto& v2 = level.Vertices[seg.Indices[sideVerts[2]]];
-            auto& v3 = level.Vertices[seg.Indices[sideVerts[3]]];
-            return Face(v0, v1, v2, v3, seg.GetSide(side), seg.GetVertexIndices(side));
+            auto verts = seg.GetVertexIndicesAll(side);
+            //auto& sideVerts = SideIndices[(int)side];
+            auto& v0 = level.Vertices[verts[0]]; //seg.Indices[sideVerts[0]]];
+            auto& v1 = level.Vertices[verts[1]]; //seg.Indices[sideVerts[1]]];
+            auto& v2 = level.Vertices[verts[2]]; //seg.Indices[sideVerts[2]]];
+            auto& v3 = verts.size() > 3 ? level.Vertices[verts[3]] : level.Vertices[verts[0]]; //seg.Indices[sideVerts[3]]];
+            return Face(v0, v1, v2, v3, seg.GetSide(side), verts);
         }
 
         bool Intersects(const Ray& ray, float& dist, bool hitBackface = false) const {
             auto i = Side.GetRenderIndices();
-            bool hitTri0 = hitBackface || Side.Normals[0].Dot(ray.direction) < 0;
-            bool hitTri1 = hitBackface || Side.Normals[1].Dot(ray.direction) < 0;
+            bool hitTri0 = hitBackface || Side.Normals[0].Dot(ray.direction) < 0 || i.size() == 3;
+            bool hitTri1 = (hitBackface || Side.Normals[1].Dot(ray.direction) < 0) && i.size() > 3;
             if (hitTri0 && ray.Intersects(GetPoint(i[0]), GetPoint(i[1]), GetPoint(i[2]), dist))
                 return true;
 
@@ -47,6 +48,13 @@ namespace Inferno {
                 return true;
 
             return false;
+        }
+
+        List<Vector3> CopyPoints(Level& level) const {
+            List<Vector3> verts(Indices.size());
+            for (int i = 0; i < Indices.size(); i++)
+                verts[i] = level.Vertices[Indices[i]];
+            return verts;
         }
 
         Array<Vector3, 4> CopyPoints() const {

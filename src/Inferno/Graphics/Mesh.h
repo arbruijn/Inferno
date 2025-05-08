@@ -35,7 +35,7 @@ namespace Inferno::Render {
             constexpr int AVG_TEXTURES_PER_MESH = 3;
             auto size = MAX_SUBMODELS * capacity * AVG_TEXTURES_PER_MESH;
             _meshes.reserve(size);
-            _handles.resize(capacity + 100);
+            _handles.resize(capacity + 800); // 800 D3 generics
         }
 
         void LoadModel(ModelID id) {
@@ -151,6 +151,8 @@ namespace Inferno::Render {
 
                 smIndex++;
             }
+
+            handle.Loaded = true;
         }
 
         MeshIndex& GetHandle(ModelID id) {

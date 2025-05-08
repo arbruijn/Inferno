@@ -104,17 +104,18 @@ namespace Inferno {
         return Vector2::Transform(uv, Matrix::CreateRotationZ(overlayAngle));
     }
 
-    void AddPolygon(Array<Vector3, 4>& verts,
-                    Array<Vector2, 4>& uv,
-                    Array<Color, 4>& lt,
+    void AddPolygon(span<Vector3> verts,
+                    span<Vector2> uv,
+                    span<Color> lt,
                     LevelGeometry& geo,
                     LevelChunk& chunk,
                     SegmentSide& side) {
         auto startIndex = geo.Vertices.size();
         chunk.AddQuad((uint16)startIndex, side);
+        int vertexCount = (int)verts.size();
 
         // create vertices for this face
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < vertexCount; i++) {
             Vector3 pos = verts[i];
             chunk.Center += pos;
 
@@ -125,7 +126,7 @@ namespace Inferno {
             geo.Vertices.push_back(vertex);
         }
 
-        chunk.Center /= 4;
+        chunk.Center /= vertexCount;
     }
 
     void Tessellate(Array<Vector3, 4>& verts,
@@ -149,7 +150,7 @@ namespace Inferno {
         for (int x = 0; x < steps + 1; x++) {
             for (int y = 0; y < steps + 1; y++) {
                 auto fx = (float)x, fy = (float)y;
-                Array<Vector3, 4> p;
+                List<Vector3> p(4);
                 auto edge0a = verts[0] + vTop * fx; // top left edge
                 auto edge0b = verts[0] + vTop * (fx + 1); // top right edge
                 auto edge1a = verts[3] + vBottom * fx; // bottom left edge
@@ -162,7 +163,7 @@ namespace Inferno {
                 p[2] = edge0b + vRight * (fy + 1); // bottom right
                 p[3] = edge0a + vLeft * (fy + 1); // bottom left
 
-                Array<Vector2, 4> uv;
+                List<Vector2> uv(4);
                 auto uvEdge0a = side.UVs[0] + uvTop * fx; // top left edge
                 auto uvEdge0b = side.UVs[0] + uvTop * (fx + 1); // top right edge
                 auto uvEdge1a = side.UVs[3] + uvBottom * fx; // bottom left edge
@@ -175,7 +176,7 @@ namespace Inferno {
                 uv[2] = uvEdge0b + uvRight * (fy + 1); // bottom right
                 uv[3] = uvEdge0a + uvLeft * (fy + 1); // bottom left
 
-                Array<Color, 4> lt{};
+                List<Color> lt(4);
                 auto ltEdge0a = side.Light[0] + ltTop * fx; // top left edge
                 auto ltEdge0b = side.Light[0] + ltTop * (fx + 1); // top right edge
                 auto ltEdge1a = side.Light[3] + ltBottom * fx; // bottom left edge
@@ -219,7 +220,7 @@ namespace Inferno {
 
         for (int id = 0; id < level.Segments.size(); id++) {
             auto& seg = level.Segments[id];
-            for (auto& sideId : SideIDs) {
+            for (SideID sideId = SideID(0); (int)sideId < seg.Sides.size(); sideId = SideID((int)sideId + 1)) {
                 auto& side = seg.GetSide(sideId);
                 auto isWall = seg.SideIsWall(sideId);
 
@@ -254,13 +255,15 @@ namespace Inferno {
 
                 chunk.TMap1 = side.TMap;
                 chunk.TMap2 = side.TMap2;
+                chunk.TMap1Handle = Seq::inRange(level.TextureHandles, (int)side.TMap) ?
+                    level.TextureHandles[(int)side.TMap] : -1;
                 chunk.EffectClip1 = Resources::GetEffectClip(side.TMap);
                 chunk.ID = id;
 
                 if (side.HasOverlay())
                     chunk.EffectClip2 = Resources::GetEffectClip(side.TMap2);
 
-                Array<Color, 4> lt = side.Light;
+                List<Color> lt = side.Light;
                 
                 if (isWall && wall) {
                     chunk.Blend = GetWallBlendMode(level, side.TMap);
@@ -272,7 +275,7 @@ namespace Inferno {
                     }
                 }
 
-                auto verts = Face::FromSide(level, seg, sideId).CopyPoints();
+                auto verts = Face::FromSide(level, seg, sideId).CopyPoints(level);
                 AddPolygon(verts, side.UVs, lt, geo, chunk, side);
 
                 // Overlays should slide in the same direction as the base texture regardless of their rotation

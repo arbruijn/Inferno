@@ -244,7 +244,7 @@ namespace Inferno::Render {
         Matrix transform = object.GetTransform();
         transform.Forward(-transform.Forward()); // flip z axis to correct for LH models
 
-        auto model = Resources::GetOutrageModel(TEST_MODEL);
+        auto model = Resources::GetOutrageModel(Resources::GameTable.Generics.at(index).ModelName);
         if (model == nullptr) return;
 
         for (int submodelIndex = 0; submodelIndex < model->Submodels.size(); submodelIndex++) {
@@ -394,11 +394,16 @@ namespace Inferno::Render {
         }
         else {
             {
-                auto& map1 = chunk.EffectClip1 == EClipID::None ?
+                if (chunk.TMap1Handle != -1) {
+                    Shaders->Level.SetMaterial1(cmdList,
+                        Render::NewTextureCache->GetResource(chunk.TMap1Handle, (float)ElapsedTime));
+                } else {
+                       auto& map1 = chunk.EffectClip1 == EClipID::None ?
                     Materials->Get(chunk.TMap1) :
                     Materials->Get(Resources::GetEffectClip(chunk.EffectClip1).VClip.GetFrame(ElapsedTime));
 
-                Shaders->Level.SetMaterial1(cmdList, map1);
+                    Shaders->Level.SetMaterial1(cmdList, map1);
+                }
             }
 
             if (chunk.TMap2 > LevelTexID::Unset) {
@@ -557,18 +562,27 @@ namespace Inferno::Render {
 
         SPDLOG_INFO("Load models");
         // Load models for objects in the level
-        _meshBuffer = MakePtr<MeshBuffer>(Resources::GameData.Models.size());
+        _meshBuffer = MakePtr<MeshBuffer>(level.IsDescent3() ?
+                                            Resources::GameTable.Generics.size() :
+                                            Resources::GameData.Models.size());
 
         List<ModelID> modelIds;
         for (auto& obj : level.Objects)
-            if (obj.Render.Type == RenderType::Model)
+            if (obj.IsGeneric) {
+                if (auto model = Resources::GetOutrageModel(Resources::GameTable.Generics[obj.ID].ModelName)) {
+                    _meshBuffer->LoadOutrageModel(*model, obj.ID);
+                    Materials->LoadOutrageModel(*model);
+                }
+            } else if (obj.Render.Type == RenderType::Model)
                 _meshBuffer->LoadModel(obj.Render.Model.ID);
 
         {
+            /*
             if (auto model = Resources::GetOutrageModel(TEST_MODEL)) {
                 _meshBuffer->LoadOutrageModel(*model, 0);
                 Materials->LoadOutrageModel(*model);
             }
+            */
 
             NewTextureCache->MakeResident();
         }
@@ -577,6 +591,10 @@ namespace Inferno::Render {
     }
 
     void DrawObject(ID3D12GraphicsCommandList* cmd, const Object& object, float alpha) {
+        if (object.IsGeneric) {
+            DrawOutrageModel(object, cmd, object.ID, false);
+            return;
+        }
         switch (object.Type) {
             case ObjectType::Robot:
             {

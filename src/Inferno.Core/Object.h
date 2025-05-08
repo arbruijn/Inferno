@@ -137,6 +137,8 @@ namespace Inferno {
         Light = 13,     // Unused
         Coop = 14,      // Co-op player
         Marker = 15,    // A marker placed by the player
+        Building = 16,  // D3
+        Door = 17       // D3
     };
 
     enum class MovementType : uint8 {
@@ -329,14 +331,14 @@ namespace Inferno {
 
     struct ContainsData {
         ObjectType Type = ObjectType::None;  // Type of object this object contains (eg, spider contains powerup)
-        int8 ID = 0;    // ID of object this object contains (eg, id = blue type = key)
+        int ID = 0;    // ID of object this object contains (eg, id = blue type = key)
         int8 Count = 0; // number of objects of type:id this object contains
     };
 
     struct Object {
         ObjSig Signature{};     // Every object ever has a unique signature
         ObjectType Type{};
-        int8 ID{};              // Index in powerup, robot, etc. list (subtype)
+        int ID{};              // Index in powerup, robot, etc. list (subtype)
         ObjectFlag Flags{};          // misc flags
         SegID Segment{};        // segment number containing object
         float Radius = 2; // radius of object for collision detection
@@ -345,6 +347,7 @@ namespace Inferno {
         sbyte matcen_creator{}; // Materialization center that created this object, high bit set if matcen-created
         float Lifespan = FLT_MAX; // how long before despawning
         ObjID Parent = ObjID::None; // Parent for projectiles, maybe attached objects
+        bool IsGeneric{};
 
         MovementData Movement;
         RenderData Render;
