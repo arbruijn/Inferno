@@ -72,9 +72,9 @@ namespace Inferno {
         return lhs = lhs & rhs;
     }
 
-    template <class T> requires is_scoped_enum_v<T>
-    T& operator ~(T& value) {
-        return value = T(~((int)value));
+    template<class T> requires is_scoped_enum_v<T>
+    constexpr T operator ~ (T value) {
+        return T(~(std::underlying_type_t<T>)value);
     }
 
     template <class T>
