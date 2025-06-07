@@ -606,6 +606,8 @@ namespace Inferno::Resources {
         // Check file system first, then hogs
         if (auto path = FileSystem::TryFindFile(name))
             return StreamReader(*path);
+        else if (auto data = Descent3Extra.ReadEntry(name))
+            return StreamReader(std::move(*data), name);
         else if (auto data = Descent3Hog.ReadEntry(name))
             return StreamReader(std::move(*data), name);
 
@@ -613,7 +615,9 @@ namespace Inferno::Resources {
     }
 
     void LoadVClips() {
+        int i = -1;
         for (auto& tex : GameTable.Textures) {
+            i++;
             if (!tex.Animated()) continue;
 
             if (auto r = OpenFile(tex.FileName)) {
@@ -621,7 +625,7 @@ namespace Inferno::Resources {
                 if (vc.Frames.size() > 0)
                     vc.FrameTime = tex.Speed / vc.Frames.size();
                 vc.FileName = tex.FileName;
-                VClips.push_back(std::move(vc));
+                VClips.push_back({i, std::move(vc)});
             }
         }
     }
@@ -631,6 +635,8 @@ namespace Inferno::Resources {
             if (auto path = FileSystem::TryFindFile("d3.hog")) {
                 SPDLOG_INFO("Loading {} and Table.gam", path->string());
                 Descent3Hog = Hog2::Read(*path);
+                if (auto path = FileSystem::TryFindFile("extra.hog"))
+                    Descent3Extra = Hog2::Read(*path);
                 if (auto r = OpenFile("Table.gam"))
                     GameTable = Outrage::GameTable::Read(*r);
 
@@ -672,6 +678,25 @@ namespace Inferno::Resources {
         return {};
     }
 
+    TexID FindOutrageTextureByFileName(const string& fileName) {
+        for (int i = 0; i < Resources::GameTable.Textures.size(); i++) {
+            if (String::InvariantEquals(Resources::GameTable.Textures[i].FileName, fileName))
+                return TexID(i + Render::OUTRAGE_TEX_INDEX);
+        }
+
+        for (int id = 0; id < Resources::VClips.size(); id++) {
+            auto& vclip = Resources::VClips[id];
+            for (auto& frame : vclip.second.Frames) {
+                if (String::InvariantEquals(frame.Name, fileName)) {
+                    return TexID(vclip.first + Render::OUTRAGE_TEX_INDEX);
+                }
+            }
+        }
+
+        return TexID::None;
+    }
+
+
     Option<Outrage::Model> ReadOutrageModel(const string& name) {
         if (auto r = OpenFile(name))
             return Outrage::Model::Read(*r);
@@ -685,13 +710,13 @@ namespace Inferno::Resources {
         if (OutrageModels.contains(name))
             return &OutrageModels[name];
 
-        //if (auto model = ReadOutrageModel(name)) {
-        //    for (auto& texture : model->Textures) {
-        //        model->TextureHandles.push_back(Render::NewTextureCache->ResolveFileName(texture));
-        //    }
-        //    OutrageModels[name] = std::move(*model);
-        //    return &OutrageModels[name];
-        //}
+        if (auto model = ReadOutrageModel(name)) {
+            for (auto& texture : model->Textures) {
+                model->TextureHandles.push_back(FindOutrageTextureByFileName(texture));
+            }
+            OutrageModels[name] = std::move(*model);
+            return &OutrageModels[name];
+        }
 
         return nullptr;
     }

@@ -78,9 +78,9 @@ namespace Inferno::Resources {
     bool FoundVertigo();
     bool FoundDescent3();
 
-    inline Hog2 Descent3Hog, Mercenary;
+    inline Hog2 Descent3Hog, Descent3Extra, Mercenary;
     inline Outrage::GameTable GameTable;
-    inline List<Outrage::VClip> VClips; // Expanded from OAF headers
+    inline List<std::pair<int, Outrage::VClip>> VClips; // Expanded from OAF headers
 
     void MountDescent3();
 

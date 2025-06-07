@@ -15,7 +15,8 @@ using namespace Inferno;
 using namespace Inferno::Editor;
 
 void DumpD3VClips() {
-    for (auto& vclip : Resources::VClips) {
+    for (auto& idxVClip : Resources::VClips) {
+        auto& vclip = idxVClip.second;
         fmt::print("v: {} FrameTime: {}s Pingpong: {}\n", vclip.Version, vclip.FrameTime, vclip.PingPong);
         for (auto& frame : vclip.Frames) {
             fmt::print("    {} : {} x {}\n", frame.Name, frame.Width, frame.Height);
