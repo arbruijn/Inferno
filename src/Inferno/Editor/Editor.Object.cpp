@@ -153,6 +153,7 @@ namespace Inferno::Editor {
         obj.Movement = {};
         obj.Control = {};
         obj.Render = {};
+        obj.IsGeneric = false;
 
         switch (type) {
             case ObjectType::Player:

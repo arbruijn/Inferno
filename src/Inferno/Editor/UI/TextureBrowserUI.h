@@ -170,6 +170,7 @@ namespace Inferno::Editor {
     private:
         void DrawFilter();
         void Descent3Browser();
+        void Descent3ObjectBrowser();
     };
 }
 

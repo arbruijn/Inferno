@@ -356,7 +356,7 @@ namespace Inferno {
                         if (pcmd->UserCallback == ImDrawCallback_ResetRenderState)
                             SetRenderState(draw_data, ctx, fr);
                         else
-                            pcmd->UserCallback(cmd_list, pcmd);
+                            pcmd->UserCallback(cmd_list, pcmd, ctx);
                     }
                     else {
                         // Apply Scissor, Bind texture, Draw

@@ -24,7 +24,9 @@ namespace Inferno::Editor {
             "Ghost",
             "Light",
             "Player (Co-op)",
-            "Marker"
+            "Marker",
+            "Building",
+            "Door"
         };
 
         if ((uint8)type >= objectTypeLabels.size()) return "Unknown";
@@ -32,6 +34,8 @@ namespace Inferno::Editor {
     }
 
     string GetObjectName(const Object& obj) {
+        if (obj.IsGeneric)
+            return Resources::GameTable.Generics[obj.ID].Name;
         switch (obj.Type) {
             case ObjectType::Coop: return fmt::format("Coop player {}", obj.ID);
             case ObjectType::Player: return fmt::format("Player {}", obj.ID);
@@ -128,7 +132,7 @@ namespace Inferno::Editor {
         return sorted;
     }
 
-    bool PowerupDropdown(const char* label, int8& id, VClipID* vclipID = nullptr) {
+    bool PowerupDropdown(const char* label, int& id, VClipID* vclipID = nullptr) {
         auto name = Resources::GetPowerupName(id);
         auto preview = name.value_or("Unknown");
         bool changed = false;
@@ -270,7 +274,7 @@ namespace Inferno::Editor {
         return sorted;
     }
 
-    bool RobotDropdown(const char* label, int8& id) {
+    bool RobotDropdown(const char* label, int& id) {
         bool changed = false;
 
         if (ImGui::BeginCombo(label, Resources::GetRobotName(id).c_str(), ImGuiComboFlags_HeightLarge)) {

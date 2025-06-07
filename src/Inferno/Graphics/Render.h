@@ -9,12 +9,16 @@
 #include "LevelMesh.h"
 #include "BitmapCache.h"
 #include "Render.Canvas.h"
+#include "Mesh.h"
+#include <DirectXTK12/SpriteBatch.h>
 
 class CommandListManager;
 class ContextManager;
 
 namespace Inferno::Render {
     const DXGI_FORMAT BackBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+
+    inline Ptr<MeshBuffer> _meshBuffer;
 
     // Smart pointers in a namespace makes no sense as they will never trigger
     inline Ptr<DeviceResources> Adapter;
@@ -42,6 +46,9 @@ namespace Inferno::Render {
     void Resize(int width, int height);
     void Shutdown();
     void Present(float alpha);
+
+    void DrawOutrageModel(const Object& object, ID3D12GraphicsCommandList* cmd, int index, bool transparentPass);
+    void DrawModel(ID3D12GraphicsCommandList* cmd, const Object& object, ModelID modelId, float alpha, TexID texOverride = TexID::None);
 
     //void ReloadShaders();
     void ReloadTextures();
@@ -101,4 +108,6 @@ namespace Inferno::Render {
 
     inline Ptr<StaticTextureDef> StaticTextures;
     extern bool LevelChanged;
+
+    inline Ptr<DirectX::SpriteBatch> _tempBatch;
 }

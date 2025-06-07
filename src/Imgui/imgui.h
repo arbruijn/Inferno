@@ -2497,7 +2497,7 @@ struct ImColor
 // The expected behavior from your rendering function is 'if (cmd.UserCallback != NULL) { cmd.UserCallback(parent_list, cmd); } else { RenderTriangles() }'
 // If you want to override the signature of ImDrawCallback, you can simply use e.g. '#define ImDrawCallback MyDrawCallback' (in imconfig.h) + update rendering backend accordingly.
 #ifndef ImDrawCallback
-typedef void (*ImDrawCallback)(const ImDrawList* parent_list, const ImDrawCmd* cmd);
+typedef void (*ImDrawCallback)(const ImDrawList* parent_list, const ImDrawCmd* cmd, void* ctx);
 #endif
 
 // Special Draw callback value to request renderer backend to reset the graphics/render state.

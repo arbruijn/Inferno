@@ -40,8 +40,6 @@ namespace Inferno::Render {
         // todo: put all of these resources into a class and use RAII
         Ptr<GraphicsMemory> _graphicsMemory;
 
-        Ptr<MeshBuffer> _meshBuffer;
-        Ptr<SpriteBatch> _tempBatch;
     }
 
     struct RenderBatchHandle {
@@ -59,6 +57,7 @@ namespace Inferno::Render {
 
     LevelMeshBuilder _levelMeshBuilder;
     Ptr<PackedBuffer> _levelMeshBuffer;
+    //Ptr<MeshBuffer> _meshBuffer;
 
     void DrawObject(ID3D12GraphicsCommandList* cmd, const Object& object, float alpha);
 
@@ -73,7 +72,7 @@ namespace Inferno::Render {
         _transparentQueue.push_back(cmd);
     }
 
-    void DrawModel(ID3D12GraphicsCommandList* cmd, const Object& object, ModelID modelId, float alpha, TexID texOverride = TexID::None) {
+    void DrawModel(ID3D12GraphicsCommandList* cmd, const Object& object, ModelID modelId, float alpha, TexID texOverride) { //  = TexID::None
         auto& effect = Effects->Object;
         effect.Apply(cmd);
         auto& model = Resources::GetModel(modelId);
@@ -541,6 +540,11 @@ namespace Inferno::Render {
     }
 
     void DrawObject(ID3D12GraphicsCommandList* cmd, const Object& object, float alpha) {
+        if (object.IsGeneric) {
+            DrawOutrageModel(object, cmd, object.ID, false);
+            DrawOutrageModel(object, cmd, object.ID, true);
+            return;
+        }
         switch (object.Type) {
             case ObjectType::Robot:
             {
