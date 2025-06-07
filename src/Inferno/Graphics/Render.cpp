@@ -165,90 +165,94 @@ namespace Inferno::Render {
         g_SpriteBatch->End();
     }
 
-    void DrawOutrageModel(const Object& /*object*/, ID3D12GraphicsCommandList* /*cmd*/, int /*index*/, bool /*transparentPass*/) {
-        //auto& meshHandle = _meshBuffer->GetOutrageHandle(index);
+    void DrawOutrageModel(const Object& object, ID3D12GraphicsCommandList* cmd, int index, bool transparentPass) {
+        auto& meshHandle = _meshBuffer->GetOutrageHandle(index);
 
-        //ObjectShader::Constants constants = {};
-        //constants.Eye = Camera.Position;
+        ObjectShader::Constants constants = {};
+        constants.Eye = Camera.Position;
 
-        //auto& seg = Game::Level.GetSegment(object.Segment);
-        //constants.Colors[0] = Settings::Editor.RenderMode == RenderMode::Shaded ? seg.VolumeLight : Color(1, 1, 1);
+        auto& seg = Game::Level.GetSegment(object.Segment);
+        constants.Colors[0] = Settings::Editor.RenderMode == RenderMode::Shaded ? seg.VolumeLight : Color(1, 1, 1);
 
-        //Matrix transform = object.GetTransform();
-        //transform.Forward(-transform.Forward()); // flip z axis to correct for LH models
+        Matrix transform = object.GetTransform();
+        transform.Forward(-transform.Forward()); // flip z axis to correct for LH models
 
-        //auto model = Resources::GetOutrageModel(TEST_MODEL);
-        //if (model == nullptr) return;
+        auto model = Resources::GetOutrageModel(Resources::GameTable.Generics[index].ModelName);
+        if (model == nullptr) return;
 
-        //for (int submodelIndex = 0; submodelIndex < model->Submodels.size(); submodelIndex++) {
-        //    auto& submodel = model->Submodels[submodelIndex];
-        //    auto& submesh = meshHandle.Meshes[submodelIndex];
+        for (int submodelIndex = 0; submodelIndex < model->Submodels.size(); submodelIndex++) {
+            auto& submodel = model->Submodels[submodelIndex];
+            auto& submesh = meshHandle.Meshes[submodelIndex];
 
-        //    // accumulate the offsets for each submodel
-        //    auto submodelOffset = Vector3::Zero;
-        //    auto* smc = &submodel;
-        //    while (smc->Parent != -1) {
-        //        submodelOffset += smc->Offset;
-        //        smc = &model->Submodels[smc->Parent];
-        //    }
+            // accumulate the offsets for each submodel
+            auto submodelOffset = Vector3::Zero;
+            auto* smc = &submodel;
+            while (smc->Parent != -1) {
+                submodelOffset += smc->Offset;
+                smc = &model->Submodels[smc->Parent];
+            }
 
-        //    auto world = Matrix::CreateTranslation(submodelOffset) * transform;
+            auto world = Matrix::CreateTranslation(submodelOffset) * transform;
 
-        //    using namespace Outrage;
+            using namespace Outrage;
 
-        //    if (submodel.HasFlag(SubmodelFlag::Facing)) {
-        //        auto smPos = Vector3::Transform(Vector3::Zero, world);
-        //        auto billboard = Matrix::CreateBillboard(smPos, Camera.Position, Camera.Up);
-        //        constants.World = world;
-        //        constants.Projection = billboard * ViewProjection;
-        //    }
-        //    else {
-        //        if (submodel.HasFlag(SubmodelFlag::Rotate))
-        //            world = Matrix::CreateFromAxisAngle(submodel.Keyframes[1].Axis, XM_2PI * submodel.Rotation * (float)Render::ElapsedTime) * world;
+            if (submodel.HasFlag(SubmodelFlag::Facing)) {
+                auto smPos = Vector3::Transform(Vector3::Zero, world);
+                auto billboard = Matrix::CreateBillboard(smPos, Camera.Position, Camera.Up);
+                constants.World = world;
+                constants.Projection = billboard * ViewProjection;
+            }
+            else {
+                if (submodel.HasFlag(SubmodelFlag::Rotate))
+                    world = Matrix::CreateFromAxisAngle(submodel.Keyframes[1].Axis, XM_2PI * submodel.Rotation * (float)Render::ElapsedTime) * world;
 
-        //        constants.World = world;
-        //        constants.Projection = world * ViewProjection;
-        //    }
+                constants.World = world;
+                constants.Projection = world * ViewProjection;
+            }
 
-        //    //constants.Time = (float)ElapsedTime;
+            //constants.Time = (float)ElapsedTime;
 
-        //    // get the mesh associated with the submodel
-        //    for (auto& [i, mesh] : submesh) {
+            // get the mesh associated with the submodel
+            for (auto& [i, mesh] : submesh) {
 
-        //        auto& material = Render::NewTextureCache->GetTextureInfo(model->TextureHandles[i]);
-        //        bool transparent = material.Saturate() || material.Alpha();
+                TexID tid = i == -1 ? TexID::None : (TexID)model->TextureHandles[i];
+                auto material = tid == TexID::None ? nullptr : Seq::tryItem(Resources::GameTable.Textures, (int)tid - Render::OUTRAGE_TEX_INDEX); //Render::NewTextureCache->GetTextureInfo();
+                const Material2D& mat = tid == TexID::None ? Render::Materials->White() : Render::Materials->Get(tid);
+                bool transparent = material && (material->Saturate() || material->Alpha());
 
-        //        if ((transparentPass && !transparent) || (!transparentPass && transparent))
-        //            continue; // skip saturate textures unless on glow pass
+                if ((transparentPass && !transparent) || (!transparentPass && transparent))
+                    continue; // skip saturate textures unless on glow pass
 
-        //        auto handle = i >= 0 ?
-        //            Render::NewTextureCache->GetResource(model->TextureHandles[i], (float)ElapsedTime) :
-        //            Materials->White.Handles[0];
+                /*
+                auto handle = i >= 0 ?
+                Render::NewTextureCache->GetResource(model->TextureHandles[i], (float)ElapsedTime) :
+                Inferno::Render::Materials->White().Handles[0];
+                */
 
-        //        bool additive = material.Saturate() || submodel.HasFlag(SubmodelFlag::Facing);
+                bool additive = material && (material->Saturate() || submodel.HasFlag(SubmodelFlag::Facing));
 
-        //        auto& effect = additive ? Effects->ObjectGlow : Effects->Object;
-        //        effect.Apply(cmd);
-        //        effect.Shader->SetSampler(cmd, GetTextureSampler());
-        //        effect.Shader->SetMaterial(cmd, handle);
+                auto& effect = additive ? Inferno::Render::Effects->ObjectGlow : Inferno::Render::Effects->Object;
+                effect.Apply(cmd);
+                effect.Shader->SetSampler(cmd, Inferno::Render::GetTextureSampler());
+                effect.Shader->SetMaterial(cmd, mat);
 
-        //        if (transparentPass && submodel.HasFlag(SubmodelFlag::Facing)) {
-        //            if (material.Saturate())
-        //                constants.Colors[0] = Color(1, 1, 1, 1);
-        //            constants.Colors[1] = Color(1, 1, 1, 1);
-        //            effect.Shader->SetConstants(cmd, constants);
-        //            DrawObjectGlow(cmd, submodel.Radius, Color(1, 1, 1, 1));
-        //        }
-        //        else {
-        //            constants.Colors[1] = material.Color; // color 1 is used for texture alpha
-        //            effect.Shader->SetConstants(cmd, constants);
-        //            cmd->IASetVertexBuffers(0, 1, &mesh->VertexBuffer);
-        //            cmd->IASetIndexBuffer(&mesh->IndexBuffer);
-        //            cmd->DrawIndexedInstanced(mesh->IndexCount, 1, 0, 0, 0);
-        //            DrawCalls++;
-        //        }
-        //    }
-        //}
+                if (transparentPass && submodel.HasFlag(SubmodelFlag::Facing)) {
+                    if (material && material->Saturate())
+                        constants.Colors[0] = Color(1, 1, 1, 1);
+                    constants.Colors[1] = Color(1, 1, 1, 1);
+                    effect.Shader->SetConstants(cmd, constants);
+                    //DrawObjectGlow(cmd, submodel.Radius, Color(1, 1, 1, 1));
+                }
+                else {
+                    constants.Colors[1] = material ? material->Color : DirectX::SimpleMath::Color(1.0f,1.0f,1.0f); // color 1 is used for texture alpha
+                    effect.Shader->SetConstants(cmd, constants);
+                    cmd->IASetVertexBuffers(0, 1, &mesh->VertexBuffer);
+                    cmd->IASetIndexBuffer(&mesh->IndexBuffer);
+                    cmd->DrawIndexedInstanced(mesh->IndexCount, 1, 0, 0, 0);
+                    //DrawCalls++;
+                }
+            }
+        }
     }
 
     void DrawVClip(ID3D12GraphicsCommandList* cmd,
