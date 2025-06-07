@@ -286,7 +286,7 @@ namespace Inferno {
         static void WriteObject(StreamWriter& writer, const Level& level, const Object& obj) {
             if (obj.Type == ObjectType::SecretExitReturn) return;
             writer.Write(obj.Type);
-            writer.Write(obj.ID); // subtype
+            writer.Write((byte)obj.ID); // subtype
             writer.Write(obj.Control.Type);
             writer.Write(obj.Movement.Type);
             writer.Write(obj.Render.Type);
@@ -300,9 +300,9 @@ namespace Inferno {
 
             // only write the contains count if the contains type is valid
             if (obj.Contains.Type == ObjectType::Robot || obj.Contains.Type == ObjectType::Powerup) {
-                writer.Write(obj.Contains.Type);
-                writer.Write(obj.Contains.ID);
-                writer.Write(obj.Contains.Count);
+                writer.Write((uint8)obj.Contains.Type);
+                writer.Write((int8)obj.Contains.ID);
+                writer.Write((int8)obj.Contains.Count);
             }
             else {
                 writer.Write((uint8)ObjectType::None);
