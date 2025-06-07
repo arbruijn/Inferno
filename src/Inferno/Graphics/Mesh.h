@@ -151,6 +151,7 @@ namespace Inferno::Render {
 
                 smIndex++;
             }
+            handle.Loaded = true;
         }
 
         MeshIndex& GetHandle(ModelID id) {
