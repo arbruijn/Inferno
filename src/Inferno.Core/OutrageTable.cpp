@@ -245,13 +245,13 @@ namespace Inferno::Outrage {
         return wb;
     }
 
-    GenericInfo ReadGenericPage(StreamReader& r) {
+    void ReadGenericPage(StreamReader& r, GenericInfo& gen) {
         constexpr int KNOWN_VERSION = 27;
         auto version = r.ReadInt16();
         if (version > KNOWN_VERSION)
             throw Exception("Unsupported generic info version");
 
-        GenericInfo gen{};
+        //GenericInfo gen{};
         gen.Type = (ObjectType)r.ReadByte();
         gen.Name = r.ReadCString(PAGENAME_LEN);
         gen.ModelName = r.ReadCString(PAGENAME_LEN);
@@ -336,7 +336,7 @@ namespace Inferno::Outrage {
             HasFlag(gen.Flags, GenericFlag::ControlAI) && HasFlag(gen.Flags, GenericFlag::Destroyable))
             gen.Score = gen.HitPoints * 3;
 
-        return gen;
+        //return gen;
     }
 
     DoorInfo ReadDoorPage(StreamReader& r) {
@@ -357,6 +357,8 @@ namespace Inferno::Outrage {
 
     GameTable GameTable::Read(StreamReader& r) {
         GameTable table{};
+
+        table.Generics.reserve(1000);
 
         while (!r.EndOfStream()) {
             auto pageType = r.ReadByte();
@@ -379,7 +381,9 @@ namespace Inferno::Outrage {
                     break;
 
                 case PAGETYPE_GENERIC:
-                    table.Generics.push_back(ReadGenericPage(r));
+                    table.Generics.push_back(GenericInfo{}); //ReadGenericPage(r));
+                    ReadGenericPage(r, table.Generics.end()[-1]);
+                    break;
 
                 case PAGETYPE_DOOR:
                     table.Doors.push_back(ReadDoorPage(r));

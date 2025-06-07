@@ -119,12 +119,13 @@ namespace Inferno {
 
         // Reads a null terminated string up to the max length
         string ReadCString(size_t maxLen) {
-            List<char> b(maxLen + 1);
+            char *buf = (char *)_alloca(maxLen);
+            //List<char> b(maxLen + 1);
             for (int i = 0; i < maxLen; i++) {
-                _stream->read(&b[i], sizeof(char));
-                if (b[i] == '\0') break;
+                _stream->read(&buf[i], sizeof(char));
+                if (buf[i] == '\0') break;
             }
-            return { b.data() };
+            return { buf };
         }
 
         // Reads a newline terminated string up to the max length
