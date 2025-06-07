@@ -266,6 +266,12 @@ namespace Inferno {
             WriteFix(v.z);
         };
 
+        void WriteVector3(const Vector3& v) {
+            WriteFloat(v.x);
+            WriteFloat(v.y);
+            WriteFloat(v.z);
+        };
+
         void WriteRotation(const Matrix3x3& m) {
             WriteVector(m.Right());
             WriteVector(m.Up());

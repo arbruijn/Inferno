@@ -5,4 +5,5 @@
 
 namespace Inferno {
     void WriteSegmentsToOrf(Level& level, span<SegID> segs, const std::filesystem::path& path, const Outrage::GameTable& table);
+    void WriteSegmentsToD3L(Level& level, span<SegID> segs, const filesystem::path& path, const Outrage::GameTable& table);
 }

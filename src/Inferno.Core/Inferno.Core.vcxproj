@@ -116,6 +116,7 @@
     <ClInclude Include="Mission.h" />
     <ClInclude Include="Object.h" />
     <ClInclude Include="OutrageBitmap.h" />
+    <ClInclude Include="OutrageLevel.h" />
     <ClInclude Include="OutrageModel.h" />
     <ClInclude Include="OutrageRoom.h" />
     <ClInclude Include="OutrageTable.h" />
@@ -140,6 +141,7 @@
     <ClCompile Include="LevelReader.cpp" />
     <ClCompile Include="LevelWriter.cpp" />
     <ClCompile Include="OutrageBitmap.cpp" />
+    <ClCompile Include="OutrageLevel.cpp" />
     <ClCompile Include="OutrageModel.cpp" />
     <ClCompile Include="OutrageRoom.cpp" />
     <ClCompile Include="OutrageTable.cpp" />

@@ -5,6 +5,7 @@
 #include "Level.h"
 #include "OutrageTable.h"
 #include "Streams.h"
+#include "OutrageLevel.h"
 
 namespace Inferno {
     namespace {
@@ -203,11 +204,16 @@ namespace Inferno {
         writer.Write(4);
     }
 
-    void WriteSegmentsToOrf(Level& level, span<SegID> segs, const filesystem::path& path, const Outrage::GameTable& table) {
+    struct Room {
+        List<Vector3> Vertices;
+        List<RoomFace> Faces;
+        List<LevelTexID> Textures;
+    };
+
+    Room ConvertSegmentsToRoom(Level& level, span<SegID> segs, const Outrage::GameTable& table) {
+        short vertexIndex = 0;
         List<Vector3> vertices;
         List<RoomFace> faces;
-        short vertexIndex = 0;
-
         List<LevelTexID> textures;
 
         for (auto& segid : segs) {
@@ -311,18 +317,64 @@ namespace Inferno {
                 }
             }
         }
+        return Room{.Vertices = vertices, .Faces = faces, .Textures = textures};
+    }
 
+    void WriteSegmentsToOrf(Level& level, span<SegID> segs, const filesystem::path& path, const Outrage::GameTable& table) {
+        auto room = ConvertSegmentsToRoom(level, segs, table);
         {
             std::ofstream file(path, std::ios::binary);
             StreamWriter writer(file, false);
 
-            if (textures.empty()) textures.push_back(LevelTexID(3000));
-            SaveRoom(writer, vertices, faces, table, textures);
+            if (room.Textures.empty()) room.Textures.push_back(LevelTexID(3000));
+            SaveRoom(writer, room.Vertices, room.Faces, table, room.Textures);
         }
 
         //{
         //    StreamReader reader(path);
         //    LoadRoom(reader);
         //}
+    }
+
+    void WriteSegmentsToD3L(Level& level, span<SegID> segs, const filesystem::path& path, const Outrage::GameTable& table) {
+        auto room = ConvertSegmentsToRoom(level, segs, table);
+        {
+            std::ofstream file(path, std::ios::binary);
+            StreamWriter writer(file, false);
+
+            if (room.Textures.empty()) room.Textures.push_back(LevelTexID(3000));
+            Outrage::OutrageLevel outrageLevel{};
+            Outrage::Room levelRoom{.MirrorFace = -1, .FogDepth = 100.0f, .FogColor = Vector3(1.0f, 1.0f, 1.0f)};
+            //Vector3 center(2050.0f, -110.0f, 2040.0f);
+            Vector3 center(2052.16089f, -101.79055f, 2049.29736f);
+            Vector3 center2(2048.0f, -100.0f, 2048.0f);
+            levelRoom.PathPoint = Vector3(2052.161f, -101.79055f, 2049.29736f);
+            for (auto& vertex : room.Vertices)
+                levelRoom.Vertices.push_back(vertex + center);
+            for (auto& face : room.Faces) {
+                Outrage::Face levelFace{.Portal = -1, .LightMultiple = 4};
+                levelFace.Texture = std::max(0, (int)room.Textures[face.Texture] - 3000);
+                levelFace.VerticesIndex = face.Vertices;
+                for (auto& uv : face.UVs)
+                    levelFace.VerticesData.push_back({.U = uv.x, .V = uv.y, .Alpha = 255});
+                levelRoom.Faces.push_back(std::move(levelFace));
+            }
+            outrageLevel.Rooms.push_back(std::move(levelRoom));
+            int i = -1;
+            for (auto& obj : level.Objects) {
+                i++;
+                Outrage::Object oobj{};
+                oobj.Type = obj.Type;
+                oobj.ID = obj.ID;
+                oobj.Handle = i | 2048;
+                oobj.Position = obj.Position + center2;
+                oobj.RoomNum = 0;
+                oobj.Rotation = obj.Rotation;
+                oobj.Flags = Outrage::ObjectFlags::PolygonObject;
+                oobj.Contains.Type = ObjectType::None;
+                outrageLevel.Objects.push_back(std::move(oobj));
+            }
+            outrageLevel.Write(writer, table);
+        }
     }
 }
