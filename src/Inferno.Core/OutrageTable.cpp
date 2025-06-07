@@ -339,6 +339,22 @@ namespace Inferno::Outrage {
         return gen;
     }
 
+    DoorInfo ReadDoorPage(StreamReader& r) {
+        DoorInfo door{};
+        auto version = r.ReadInt16();
+        door.Name = r.ReadCString(PAGENAME_LEN);
+        door.ModelName = r.ReadCString(PAGENAME_LEN);
+        door.TotalOpenTime = r.ReadFloat();
+        door.TotalCloseTime = r.ReadFloat();
+        door.TotalTimeOpen = r.ReadFloat();
+        door.Flags = r.ReadByte();
+        door.HitPoints = version >= 3 ? r.ReadInt16() : 0;
+        door.OpenSoundName = r.ReadCString(PAGENAME_LEN);
+        door.CloseSoundName = r.ReadCString(PAGENAME_LEN);
+        door.ModuleName = version >= 2 ? r.ReadCString(MAX_MODULENAME_LEN) : "";
+        return door;
+    }
+
     GameTable GameTable::Read(StreamReader& r) {
         GameTable table{};
 
@@ -359,6 +375,9 @@ namespace Inferno::Outrage {
 
                 case PAGETYPE_GENERIC:
                     table.Generics.push_back(ReadGenericPage(r));
+
+                case PAGETYPE_DOOR:
+                    table.Doors.push_back(ReadDoorPage(r));
                     break;
             }
 

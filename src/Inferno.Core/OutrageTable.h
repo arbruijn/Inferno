@@ -374,6 +374,19 @@ namespace Inferno::Outrage {
         List<DeathInfo> DeathTypes;
     };
 
+    struct DoorInfo {
+        string Name;
+        string ModelName;
+        float TotalOpenTime;
+        float TotalCloseTime;
+        float TotalTimeOpen;
+        ubyte Flags;
+        int16 HitPoints;
+        string OpenSoundName;
+        string CloseSoundName;
+        string ModuleName;
+    };
+
     struct GameTable {
         enum {
             TABLE_FILE_BASE = 0,
@@ -386,6 +399,7 @@ namespace Inferno::Outrage {
         List<TextureInfo> Textures;
         List<SoundInfo> Sounds;
         List<GenericInfo> Generics;
+        List<DoorInfo> Doors;
         static GameTable Read(StreamReader&);
     };
 }
