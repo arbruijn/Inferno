@@ -17,7 +17,7 @@ namespace Inferno::Render {
 
     class MeshBuffer {
         List<Mesh> _meshes; // Buffer stores multiple meshes
-        PackedBuffer _buffer{ 1024 * 1024 * 10 };
+        PackedBuffer _buffer{ 1024 * 1024 * 10 * 2};
 
         // Pointers to individual meshes in a polymodel
         struct MeshIndex {
@@ -35,7 +35,7 @@ namespace Inferno::Render {
             constexpr int AVG_TEXTURES_PER_MESH = 3;
             auto size = MAX_SUBMODELS * capacity * AVG_TEXTURES_PER_MESH;
             _meshes.reserve(size);
-            _handles.resize(capacity + 100);
+            _handles.resize(capacity + 1000);
         }
 
         void LoadModel(ModelID id) {
