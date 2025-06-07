@@ -400,6 +400,8 @@ namespace Inferno::Outrage {
         List<SoundInfo> Sounds;
         List<GenericInfo> Generics;
         List<DoorInfo> Doors;
+        Dictionary<string, uint> TextureNames;
         static GameTable Read(StreamReader&);
+        GameTable();
     };
 }

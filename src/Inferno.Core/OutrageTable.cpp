@@ -365,9 +365,14 @@ namespace Inferno::Outrage {
             if (len <= 0) throw Exception("bad page length");
 
             switch (pageType) {
-                case PAGETYPE_TEXTURE:
-                    table.Textures.push_back(ReadTexturePage(r));
+                case PAGETYPE_TEXTURE: {
+                    auto tex = ReadTexturePage(r);
+                    if (!table.TextureNames.contains(tex.Name)) {
+                        table.TextureNames[tex.Name] = table.Textures.size();
+                        table.Textures.push_back(std::move(tex));
+                    }
                     break;
+                }
 
                 case PAGETYPE_SOUND:
                     table.Sounds.push_back(ReadSoundPage(r));
@@ -386,5 +391,12 @@ namespace Inferno::Outrage {
         }
 
         return table;
+    }
+
+    GameTable::GameTable() {
+        TextureInfo tex{};
+        tex.Name = "SAMPLE TEXTURE";
+        TextureNames[tex.Name] = Textures.size();
+        Textures.push_back(std::move(tex));
     }
 }
