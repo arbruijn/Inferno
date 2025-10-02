@@ -83,6 +83,7 @@ namespace Inferno::Resources {
     inline List<std::pair<int, Outrage::VClip>> VClips; // Expanded from OAF headers
 
     void MountDescent3();
+    void TranslatePowerups();
 
     Option<StreamReader> OpenFile(const string& name);
 

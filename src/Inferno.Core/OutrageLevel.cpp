@@ -453,6 +453,31 @@ namespace Inferno::Outrage {
         return translate;
     }
 
+    ESegInfo ReadEditorSegments(StreamReader& r)
+    {
+        ESegInfo editorSegments{};
+        int version = r.ReadInt16();
+        if (version != 0)
+            return editorSegments;
+        editorSegments.Vertices.resize(r.ReadInt32());
+        for (auto& vertex : editorSegments.Vertices)
+            vertex = r.ReadVector3();
+        editorSegments.Segments.resize(r.ReadInt32());
+        for (auto& segment : editorSegments.Segments) {
+            for (auto& vertex : segment.Indices)
+                vertex = r.ReadInt16();
+            for (auto& side : segment.Sides) {
+                side.ChildSegment = r.ReadInt16();
+                side.TMap = r.ReadInt16();
+                for (auto& uv : side.UVs) {
+                    uv.x = r.ReadFloat();
+                    uv.y = r.ReadFloat();
+                }
+            }
+        }
+        return editorSegments;
+    }
+
     static void WriteFace(StreamWriter& f, Face& face) {
         f.Write((ubyte)face.VerticesIndex.size());
         for (auto index : face.VerticesIndex)
@@ -764,6 +789,29 @@ namespace Inferno::Outrage {
         WriteEndChunk(f, pos);
     }
 
+    void OutrageLevel::WriteEditorSegments(StreamWriter& f)
+    {
+        auto pos = WriteStartChunk(f, CHUNK_ESEG);
+        f.Write((int16)0); // version
+        f.Write((int32)EditorSegments.Vertices.size());
+        for (auto& vertex : EditorSegments.Vertices)
+            f.WriteVector3(vertex);
+        f.Write((int32)EditorSegments.Segments.size());
+        for (auto& segment : EditorSegments.Segments) {
+            for (auto& vertex : segment.Indices)
+                f.Write((int16)vertex);
+            for (auto& side : segment.Sides) {
+                f.Write((int16)side.ChildSegment);
+                f.Write((int16)side.TMap);
+                for (auto& uv : side.UVs) {
+                    f.WriteFloat(uv.x);
+                    f.WriteFloat(uv.y);
+                }
+            }
+        }
+        WriteEndChunk(f, pos);
+    }
+
     void OutrageLevel::Write(StreamWriter& f, const GameTable& table)
     {
         f.Write(LEVEL_FILE_TAG);
@@ -844,11 +892,9 @@ namespace Inferno::Outrage {
         if (version < 13) {
             return nullopt;
         }
-        List<Room> rooms;
-        List<Outrage::Object> objects;
+        OutrageLevel level{};
         List<int> textureTranslate;
         List<int> genericTranslate;
-        string name;
         while (!r.EndOfStream()) {
             uint chunkType = r.ReadUInt32();
             size_t startPos = r.Position();
@@ -865,16 +911,16 @@ namespace Inferno::Outrage {
                     /*int num8 = */r.ReadInt32();
                     /*int num9 = */r.ReadInt32();
                 }
-                rooms.resize(roomCount);
+                level.Rooms.resize(roomCount);
                 for (int i = 0; i < roomCount; i++) {
                     int roomNum = version < 96 ? i : r.ReadInt16();
-                    if (roomNum >= rooms.size())
-                        rooms.resize(roomNum + 1);
-                    rooms[roomNum] = ReadRoom(r, version, textureTranslate);
+                    if (roomNum >= level.Rooms.size())
+                        level.Rooms.resize(roomNum + 1);
+                    level.Rooms[roomNum] = ReadRoom(r, version, textureTranslate);
                 }
             } else if (chunkType == CHUNK_OBJECTS) {
                 int objectCount = r.ReadInt32();
-                objects.resize(objectCount);
+                level.Objects.resize(objectCount);
                 for (int i = 0;i < objectCount; i++) {
                     int handle, idx;
                     if (version >= 45) {
@@ -882,25 +928,22 @@ namespace Inferno::Outrage {
                         if (version < 94)
                             handle = ((handle & ~1023) << 1) | (handle & 1023);
                         idx = handle & 2047;
-                        if (idx >= objects.size())
-                            objects.resize(idx + 1);
+                        if (idx >= level.Objects.size())
+                            level.Objects.resize(idx + 1);
                     } else {
                         handle = i + 2048;
                         idx = i;
                     }
-                    objects[idx] = ReadObject(r, version, genericTranslate);
-                    objects[idx].Handle = handle;
+                    level.Objects[idx] = ReadObject(r, version, genericTranslate);
+                    level.Objects[idx].Handle = handle;
                 }
             } else if (chunkType == CHUNK_LEVEL_INFO) {
-                name = ReadString(r);
+                level.Name = ReadString(r);
+            } else if (chunkType == CHUNK_ESEG) {
+                level.EditorSegments = ReadEditorSegments(r);
             }
             r.Seek(startPos + chunkSize);
         }
-        OutrageLevel level{};
-        level.Name = name;
-        level.Rooms = rooms;
-        level.Objects = objects;
-        //level.texture_xlate = textures;
         return {level};
     }
     OutrageLevel::OutrageLevel()

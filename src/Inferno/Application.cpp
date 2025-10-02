@@ -31,13 +31,13 @@ void LoadAllD3Models() {
     //}
 
     for (auto& entry : Resources::Descent3Hog.Entries) {
-        if (String::ToLower(entry.name).ends_with("oof")) {
+        if (String::ToLower(entry.Name).ends_with("oof")) {
             try {
-                auto r = Resources::OpenFile(entry.name);
+                auto r = Resources::OpenFile(entry.Name);
                 auto model = Outrage::Model::Read(*r);
             }
             catch (const std::exception& e) {
-                SPDLOG_ERROR("{}: {}", entry.name, e.what());
+                SPDLOG_ERROR("{}: {}", entry.Name, e.what());
             }
 
             //for (auto& sm : model.Submodels) {

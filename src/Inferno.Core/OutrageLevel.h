@@ -197,6 +197,23 @@ namespace Inferno::Outrage {
         string CustomDefaultScriptName;
         string CustomDefaultModuleName;
     };
+
+    struct ESegSide {
+        int16 ChildSegment;
+        int16 TMap;
+        Array<Vector2, 4> UVs;
+    };
+
+    struct ESegSegment {
+        Array<int16, 8> Indices;
+        Array<ESegSide, 6> Sides;
+    };
+
+    struct ESegInfo {
+        List<Vector3> Vertices;
+        List<ESegSegment> Segments;
+    };
+
     static constexpr uint MkTag(char a, char b, char c, char d) {
         return a | (b << 8) | (c << 16) | (d << 24);
     }
@@ -238,6 +255,8 @@ namespace Inferno::Outrage {
     static constexpr uint CHUNK_BNODES = MkTag('N', 'O', 'D', 'E');
     static constexpr uint CHUNK_OVERRIDE_SOUNDS = MkTag('O', 'S', 'N', 'D');
     static constexpr uint CHUNK_FFT_MOD = MkTag('F', 'F', 'T', 'M');
+    static constexpr uint CHUNK_ESEG = MkTag('E', 'S', 'E', 'G');
+
     class OutrageLevel
     {
             int ROOM_NAME_LEN;
@@ -262,11 +281,13 @@ namespace Inferno::Outrage {
         void WriteTerrain(StreamWriter& f, const GameTable& table);
         void WriteObject(StreamWriter& f, const Outrage::Object& obj);
         void WriteObjects(StreamWriter& f);
+        void WriteEditorSegments(StreamWriter& f);
     public:
         OutrageLevel();
         string Name;
         List<Room> Rooms;
         List<Outrage::Object> Objects;
+        ESegInfo EditorSegments;
         static std::optional<OutrageLevel> Read(StreamReader& r, const Outrage::GameTable& table);
         void Write(StreamWriter& f, const Outrage::GameTable& table);
     };

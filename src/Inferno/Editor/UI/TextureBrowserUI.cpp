@@ -342,7 +342,15 @@ namespace Inferno::Editor {
         target.Transition(cmd, D3D12_RESOURCE_STATE_RENDER_TARGET);
         target.ClearColor = Settings::Editor.Background;
         cmd->ClearRenderTargetView(target.GetRTV(), target.ClearColor, 0, nullptr);
-        cmd->ClearDepthStencilView(depthBuffer.GetDSV(), D3D12_CLEAR_FLAG_DEPTH, depthBuffer.ClearDepth, 0, 0, nullptr);
+        depthBuffer.Clear(cmd);
+        //depthBuffer.Transition(cmd, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+
+        //auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(depthBuffer.Get(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+        //cmd->ResourceBarrier(1, &barrier);
+
+
+        //cmd->ClearDepthStencilView(depthBuffer.GetDSV(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
 
         auto rtv = target.GetRTV();
         auto dsv = depthBuffer.GetDSV();
@@ -358,7 +366,8 @@ namespace Inferno::Editor {
         viewport.MinDepth = D3D12_MIN_DEPTH;
         viewport.MaxDepth = D3D12_MAX_DEPTH;
         cmd->RSSetViewports(1, &viewport);
-        Render::Camera.SetViewport(width, height);
+        #if 1
+        Render::Camera.SetViewport((float)width, (float)height);
         Render::Camera.Position = Vector3(0.0f, 0.0f, 20.0f);
         Render::Camera.Target = Vector3::Zero;
         Render::Camera.Up = Vector3::UnitY;
@@ -370,6 +379,14 @@ namespace Inferno::Editor {
         Render::Camera.Projection = Matrix::CreateOrthographicOffCenter(0, 64.0f, 64.0f, 0, 0.2f, 200.0f); //(1000.0f, 1000.0f, 0.1f, 200.0f); //Render::Camera.Viewport.minDepth, Render::Camera.Viewport.maxDepth);
         Render::ViewProjection = Render::Camera.ViewProj();
         //Render::CameraFrustum = Render::Camera.GetFrustum();
+        #else
+        auto position = Vector3(0.0f, 0.0f, 20.0f);
+        auto vtarget = Vector3::Zero;
+        auto up = Vector3::UnitY;
+        Matrix view = DirectX::XMMatrixLookAtLH(position, vtarget, up);
+        Matrix proj = Matrix::CreateOrthographicOffCenter(0, 64.0f, 64.0f, 0, 0.2f, 200.0f);
+        Render::ViewProjection = view * proj;
+        #endif
     }
 
     static void PreviewRenderTargetDone(ID3D12GraphicsCommandList* cmd, float x, float y, int width, int height, Matrix &proj) {
@@ -391,6 +408,7 @@ namespace Inferno::Editor {
 
     static D3D12_RECT preview_win;
 
+#if 0
     void PreviewDrawModel(ID3D12GraphicsCommandList* cmd, const Object& object, ModelID modelId, float alpha, TexID texOverride, int width, int height) {
         auto& effect = Render::Effects->Object;
         effect.Apply(cmd);
@@ -454,6 +472,7 @@ namespace Inferno::Editor {
             }
         }
     }
+#endif
 
     void ObjCallback(const ImDrawList* parent_list, const ImDrawCmd* cmd, void* ctx_void) {
         ID3D12GraphicsCommandList *ctx = (ID3D12GraphicsCommandList*)ctx_void;
@@ -469,8 +488,12 @@ namespace Inferno::Editor {
         CD3DX12_VIEWPORT vp(L, T, W, H);
         ctx->RSSetViewports(1, &vp);
 
+        auto OldCamViewport = Render::Camera.Viewport;
         auto OldCamPos = Render::Camera.Position;
         auto OldCamTarget = Render::Camera.Target;
+        auto OldCamView = Render::Camera.View;
+        auto OldCamProj = Render::Camera.Projection;
+        auto OldCamUp = Render::Camera.Up;
 
         Render::Camera.SetViewport(W, H);
         Render::ViewProjection = Render::Camera.ViewProj();
@@ -495,8 +518,11 @@ namespace Inferno::Editor {
 
         //auto modelId = Resources::GameData.PlayerShip.Model;
         //PreviewDrawModel(ctx, object, modelId, 1.0f, TexID::None, (int)W, (int)H);
+        auto OldRenderMode = Settings::Editor.RenderMode;
+        Settings::Editor.RenderMode = RenderMode::Textured;
         Render::DrawOutrageModel(object, ctx, cmd->IdxOffset, false);
         Render::DrawOutrageModel(object, ctx, cmd->IdxOffset, true);
+        Settings::Editor.RenderMode = OldRenderMode;
 
         auto backBuffer = Render::Adapter->GetBackBuffer();
         auto rtv = backBuffer->GetRTV();
@@ -519,8 +545,15 @@ namespace Inferno::Editor {
 
         PreviewRenderTargetDone(ctx, L, T, W, H, dproj);
 
+        #if 1
+        Render::Camera.Up = OldCamUp;
+        Render::Camera.Projection = OldCamProj;
+        Render::Camera.View = OldCamView;
         Render::Camera.Position = OldCamPos;
         Render::Camera.Target = OldCamTarget;
+        Render::Camera.Viewport = OldCamViewport;
+        Render::ViewProjection = Render::Camera.ViewProj();
+        #endif
 
         #if 0
         Render::Debug::BeginFrame();
@@ -606,10 +639,16 @@ namespace Inferno::Editor {
             ImGui::Text("No texture selected");
         }
         #else
-        auto& obj = Game::Level.GetObject(Selection.Object);
-        if (obj.IsGeneric)
-            ImGui::Text(Resources::GameTable.Generics[obj.ID].Name.c_str());
-        else
+        int objNum = (int)Selection.Object;
+        if (Seq::inRange(Game::Level.Objects, objNum)) {
+            auto& obj = Game::Level.Objects[objNum];
+            if (obj.IsGeneric)
+                ImGui::Text(Resources::GameTable.Generics[obj.ID].Name.c_str());
+            else
+                objNum = -1;
+        } else
+            objNum = -1;
+        if (objNum == -1)
             ImGui::Text("No object selected");
         #endif
 
@@ -634,7 +673,7 @@ namespace Inferno::Editor {
         tileSize.y *= Shell::DpiScale;
 
         constexpr ImVec4 bg = { 0.1f, 0.1f, 0.1f, 1.0f };
-        constexpr int borderThickess = 2;
+        //constexpr int borderThickess = 2;
 
         auto tmap1 = LevelTexID::None, tmap2 = LevelTexID::Unset;
         if (auto seg = Game::Level.TryGetSegment(Editor::Selection.Segment)) {
@@ -696,11 +735,11 @@ namespace Inferno::Editor {
                     });
                 }
                 #endif
-                int id = list[i];
+                auto id = list[i];
                 auto modelName = all[id].ModelName;
                 auto model = Resources::GetOutrageModel(modelName);
                 obj.IsGeneric = true;
-                obj.ID = list[i];
+                obj.ID = (int)list[i];
                 obj.Type = all[list[i]].Type;
                 obj.Radius = model->Radius;
             }

@@ -84,12 +84,7 @@ namespace Inferno::Editor {
         }
     }
 
-    void ExportSegmentsToD3L() {
-        if (Editor::Marked.Segments.empty()) {
-            SetStatusMessageWarn("Select segments before exporting");
-            return;
-        }
-
+    void ExportLevelToD3L() {
         List<COMDLG_FILTERSPEC> filter = { { L"Outrage Level File", L"*.d3l" } };
 
         auto path = SaveFileDialog(filter, 0, L"room.d3l", L"Export D3L");
@@ -98,7 +93,7 @@ namespace Inferno::Editor {
             auto segs = Seq::ofSet(Editor::Marked.Segments);
 
             try {
-                WriteSegmentsToD3L(Game::Level, segs, *path, Resources::GameTable);
+                WriteLevelToD3L(Game::Level, *path, Resources::GameTable);
             }
             catch (...) {
                 ShowErrorMessage(L"Something went wrong when exporting D3L.");
@@ -421,8 +416,8 @@ namespace Inferno::Editor {
             if (ImGui::BeginMenu("Export")) {
                 if (ImGui::MenuItem("Segments to ORF"))
                     ExportSegmentsToOrf();
-                if (ImGui::MenuItem("Segments to D3L"))
-                    ExportSegmentsToD3L();
+                if (ImGui::MenuItem("Level to D3L"))
+                    ExportLevelToD3L();
 
                 ImGui::EndMenu();
             }

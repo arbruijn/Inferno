@@ -10,6 +10,7 @@
 #include "Editor.h"
 #include "Graphics/Render.h"
 #include "Editor.Diagnostics.h"
+#include "OutrageRoom.h"
 
 namespace Inferno::Editor {
     constexpr auto METADATA_EXTENSION = "ied"; // inferno engine data
@@ -124,7 +125,9 @@ namespace Inferno::Editor {
     int32 FileVersionFromHeader(filesystem::path path) {
         StreamReader reader(path);
         auto id = reader.ReadString(3);
-        if (id == "DHF") return 0; // Return 0 for hog files
+        if (id == "DHF" || id == "HOG") return 0; // Return 0 for hog files
+
+        if (id == "D3L") return -3;
 
         reader.Seek(0);
         auto sig = (uint)reader.ReadInt32();
@@ -175,10 +178,70 @@ namespace Inferno::Editor {
         return data;
     }
 
+    void WriteHog2(Level& level, HogFile& mission, filesystem::path path) {
+        filesystem::path tempPath = path;
+        tempPath.replace_extension(".tmp");
+
+        try {
+            if (level.FileName.empty())
+                throw Exception("Level filename is empty!");
+
+            auto baseName = String::NameWithoutExtension(level.FileName);
+            auto metadataName = baseName + "." + METADATA_EXTENSION;
+            Hog2Writer writer(tempPath, mission.Entries.size() + 2); // write to temp
+            fmt::println("Copying existing HOG files:");
+
+            for (auto& entry : mission.Entries) {
+                // Does the file match the level name?
+                if (entry.NameWithoutExtension() == baseName) {
+                    // Skip files serialized later
+                    constexpr std::array skippedExtensions = { ".d3l", ".ied" };
+                    auto ext = String::ToLower(entry.Extension());
+                    if (Seq::contains(skippedExtensions, ext))
+                        continue;
+                }
+
+                auto data = mission.ReadEntry(entry);
+                writer.WriteEntry(entry.Name, data, entry.Flags, entry.Timestamp);
+                fmt::print("{}:{}\n", entry.Name, data.size());
+            }
+
+
+            fmt::print("\nWriting new files: ");
+
+            // Write level and metadata
+            auto levelData = SerializeToMemory([&level](StreamWriter& w) { ExportOutrageLevel(level, w, Resources::GameTable); return w.Position(); });
+            writer.WriteEntry(level.FileName, levelData, 0, (uint)time(NULL));
+            fmt::print("{}:{} ", level.FileName, levelData.size());
+
+            auto levelMetadata = SerializeLevelMetadata(level);
+            writer.WriteEntry(metadataName, levelMetadata, 0, (uint)time(NULL)); // IED file
+            fmt::print("{}:{} ", metadataName, levelMetadata.size());
+
+            fmt::println("");
+        }
+        catch (const std::exception& e) {
+            ShowErrorMessage(e);
+            SPDLOG_ERROR(e.what());
+            return;
+        }
+
+        BackupFile(path);
+        filesystem::remove(path); // Remove existing
+        filesystem::rename(tempPath, path); // Rename temp to destination
+        fmt::print("\n");
+    }
+
+
     // Writes a HOG file and updates the level
     void WriteHog(Level& level, HogFile& mission, filesystem::path path) {
         filesystem::path tempPath = path;
         tempPath.replace_extension(".tmp");
+
+        if (ExtensionEquals(path, L"mn3")) {
+            WriteHog2(level, mission, path);
+            return;
+        }
 
         try {
             if (level.FileName.empty())
@@ -271,6 +334,11 @@ namespace Inferno::Editor {
                     if (levelEntries.size() > 1 && Resources::HasGameData()) 
                         Events::ShowDialog(DialogType::HogEditor);
                 }
+            }
+            else if (version == -3) {
+                auto level = ImportOutrageLevel(path, Resources::GameTable);
+                Game::UnloadMission();
+                Game::LoadLevel(std::move(level));
             }
             else {
                 throw Exception("Unknown file type");
@@ -371,9 +439,16 @@ namespace Inferno::Editor {
         if (!Resources::HasGameData()) return;
 
         auto& level = Game::Level;
-        List<COMDLG_FILTERSPEC> filter = { { L"Mission", L"*.hog" } };
+        List<COMDLG_FILTERSPEC> filter = { };
 
-        if (level.IsDescent1())
+        if (Settings::Editor.Descent3Mode)
+            filter.push_back({ L"Mission", L"*.mn3" });
+        else
+            filter.push_back({ L"Mission", L"*.hog" });
+
+        if (Settings::Editor.Descent3Mode)
+            filter.push_back({ L"Descent 3 Level", L"*.d3l" });
+        else if (level.IsDescent1())
             filter.push_back({ L"Descent 1 Level", L"*.rdl" });
         else
             filter.push_back({ L"Descent 2 Level", L"*.rl2" });
@@ -599,9 +674,9 @@ namespace Inferno::Editor {
                 if (!CanCloseCurrentFile()) return;
 
                 static constexpr COMDLG_FILTERSPEC filter[] = {
-                    { L"Descent Levels", L"*.hog;*.rl2;*.rdl" },
-                    { L"Missions", L"*.hog" },
-                    { L"Levels", L"*.rl2;*.rdl" },
+                    { L"Descent Levels", L"*.hog;*.rl2;*.rdl;*.mn3;*.d3l" },
+                    { L"Missions", L"*.hog;*.mn3" },
+                    { L"Levels", L"*.rl2;*.rdl;*.d3l" },
                     { L"All Files", L"*.*" }
                 };
 

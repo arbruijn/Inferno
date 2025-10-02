@@ -472,6 +472,13 @@ namespace Inferno::Editor {
             if (Resources::Descent3Hog.Entries.empty())
                 Resources::MountDescent3();
 
+            Resources::TranslatePowerups();
+
+            if (Game::Mission && Game::Mission->Path.extension() == ".hog") {
+                Game::Mission = Hog2{};
+                Game::Mission->Path = Game::Mission->Path.replace_extension(".mn3");
+            }
+
             Events::LevelChanged(); // Refresh the texture browser
         }
     }

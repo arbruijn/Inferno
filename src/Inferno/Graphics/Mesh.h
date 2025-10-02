@@ -29,11 +29,12 @@ namespace Inferno::Render {
         List<MeshIndex> _handles;
         size_t _capacity;
     public:
+        static constexpr int OUTRAGE_SHIP_INDEX = 995;
 
         MeshBuffer(size_t capacity) : _capacity(capacity) {
             SPDLOG_INFO("Created mesh buffer with capacity {}", capacity);
             constexpr int AVG_TEXTURES_PER_MESH = 3;
-            auto size = MAX_SUBMODELS * capacity * AVG_TEXTURES_PER_MESH;
+            auto size = MAX_SUBMODELS * (capacity + 200) * AVG_TEXTURES_PER_MESH;
             _meshes.reserve(size);
             _handles.resize(capacity + 1000);
         }

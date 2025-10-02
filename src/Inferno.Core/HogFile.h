@@ -9,6 +9,10 @@ namespace Inferno {
         string Name;
         size_t Offset{};
         size_t Size{};
+
+        uint Flags{};
+        uint Timestamp{};
+
         filesystem::path Path; // Filesystem path for imported files
         Option<int> Index; // HOG index for saved files
 
@@ -28,7 +32,7 @@ namespace Inferno {
 
         bool IsLevel() const {
             auto ext = Extension();
-            return String::InvariantEquals(ext, ".rl2") || String::InvariantEquals(ext, ".rdl");
+            return String::InvariantEquals(ext, ".rl2") || String::InvariantEquals(ext, ".rdl") || String::InvariantEquals(ext, ".d3l");
         }
 
         bool IsBriefing() const {

@@ -46,7 +46,10 @@ namespace Inferno::Game {
     }
 
     void LoadMission(const filesystem::path& file) {
-        Mission = HogFile::Read(FileSystem::FindFile(file));
+        if (file.extension().compare(".mn3") == 0)
+            Mission = Hog2::Read(FileSystem::FindFile(file));
+        else
+            Mission = HogFile::Read(FileSystem::FindFile(file));
     }
 
     // Tries to read the mission file (msn / mn2) for the loaded mission

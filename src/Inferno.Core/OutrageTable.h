@@ -387,6 +387,17 @@ namespace Inferno::Outrage {
         string ModuleName;
     };
 
+    struct ShipInfo {
+        string Name;
+        string CockpitName;
+        string HudConfigName;
+
+        string ImageName;
+        string DyingImageName;
+        string MedImageName;
+        string LoImageName;
+    };
+
     struct GameTable {
         enum {
             TABLE_FILE_BASE = 0,
@@ -400,6 +411,7 @@ namespace Inferno::Outrage {
         List<SoundInfo> Sounds;
         List<GenericInfo> Generics;
         List<DoorInfo> Doors;
+        List<ShipInfo> Ships;
         Dictionary<string, uint> TextureNames;
         static GameTable Read(StreamReader&);
         GameTable();

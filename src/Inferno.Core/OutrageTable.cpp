@@ -7,6 +7,7 @@ namespace Inferno::Outrage {
     enum PageType {
         PAGETYPE_TEXTURE = 1,
         PAGETYPE_DOOR = 5,
+        PAGETYPE_SHIP = 6,
         PAGETYPE_SOUND = 7,
         PAGETYPE_GENERIC = 10,
     };
@@ -355,6 +356,23 @@ namespace Inferno::Outrage {
         return door;
     }
 
+    ShipInfo ReadShipPage(StreamReader& r) {
+        ShipInfo ship{};
+
+        auto version = r.ReadInt16();
+
+        ship.Name = r.ReadCString(PAGENAME_LEN);
+        ship.CockpitName = r.ReadCString(PAGENAME_LEN);
+        ship.HudConfigName = r.ReadCString(PAGENAME_LEN);
+
+        ship.ImageName = r.ReadCString(PAGENAME_LEN);
+        ship.DyingImageName = r.ReadCString(PAGENAME_LEN);
+        ship.MedImageName = r.ReadCString(PAGENAME_LEN);
+        ship.LoImageName = r.ReadCString(PAGENAME_LEN);
+
+        return ship;
+    }
+
     GameTable GameTable::Read(StreamReader& r) {
         GameTable table{};
 
@@ -387,6 +405,10 @@ namespace Inferno::Outrage {
 
                 case PAGETYPE_DOOR:
                     table.Doors.push_back(ReadDoorPage(r));
+                    break;
+
+                case PAGETYPE_SHIP:
+                    table.Ships.push_back(ReadShipPage(r));
                     break;
             }
 

@@ -606,8 +606,8 @@ namespace Inferno::Resources {
         // Check file system first, then hogs
         if (auto path = FileSystem::TryFindFile(name))
             return StreamReader(*path);
-        else if (auto data = Descent3Extra.ReadEntry(name))
-            return StreamReader(std::move(*data), name);
+        else if (auto dataExtra = Descent3Extra.ReadEntry(name))
+            return StreamReader(std::move(*dataExtra), name);
         else if (auto data = Descent3Hog.ReadEntry(name))
             return StreamReader(std::move(*data), name);
 
@@ -635,8 +635,8 @@ namespace Inferno::Resources {
             if (auto path = FileSystem::TryFindFile("d3.hog")) {
                 SPDLOG_INFO("Loading {} and Table.gam", path->string());
                 Descent3Hog = Hog2::Read(*path);
-                if (auto path = FileSystem::TryFindFile("extra.hog"))
-                    Descent3Extra = Hog2::Read(*path);
+                if (auto pathExtra = FileSystem::TryFindFile("extra.hog"))
+                    Descent3Extra = Hog2::Read(*pathExtra);
                 if (auto r = OpenFile("Table.gam"))
                     GameTable = Outrage::GameTable::Read(*r);
 
@@ -650,6 +650,71 @@ namespace Inferno::Resources {
         catch (const std::exception& e) {
             SPDLOG_ERROR("Error loading Descent 3\n{}", e.what());
         }
+    }
+
+    void TranslatePowerups() {
+        static std::array d3Powerups {
+            (const char *)NULL,
+            "Energy",
+            "Shield",
+            "SuperLaser",
+            (const char *)NULL,
+            (const char *)NULL,
+            (const char *)NULL,
+            (const char *)NULL,
+            (const char *)NULL,
+            (const char *)NULL,
+            "Concussion",
+            "4PackConc",
+            "QuadLaser",
+            "Vauss",
+            "Napalm",
+            "Plasmacannon",
+            "Fusioncannon",
+            "ProxMinePowerup",
+            "Homing",
+            "4PackHoming",
+            "Smart",
+            "Mega",
+            "Vauss clip",
+            "Cloak",
+            "Rapidfire",
+            "Invulnerability",
+            (const char *)NULL,
+            (const char *)NULL,
+            "MassDriver",
+            "EMDlauncher",
+            "Microwave",
+            "Omegacannon",
+            "SuperLaser",
+            "FullMap",
+            "Converter",
+            (const char *)NULL, // ammo rack
+            "Afterburner",
+            (const char *)NULL, // headlight
+            "Frag",
+            "4PackFrag",
+            "Guided",
+            "4PackGuided",
+            "Seeker3Pack",
+            "Cyclone",
+            "Cyclone", // 4pack
+            "BlackShark",
+            (const char *)NULL,
+            (const char *)NULL
+        };
+        if (GameTable.Generics.empty())
+            return;
+        for (auto& obj : Game::Level.Objects)
+            if (obj.Type == ObjectType::Powerup && !obj.IsGeneric && obj.ID < d3Powerups.size() && d3Powerups[obj.ID]) {
+                int id = -1;
+                const char *name = d3Powerups[obj.ID];
+                for (size_t i = 0; i < GameTable.Generics.size(); i++)
+                    if (_stricmp(name, GameTable.Generics[i].Name.c_str()) == 0) {
+                        obj.ID = (int)i;
+                        obj.IsGeneric = true;
+                    }
+            }
     }
 
     Option<Outrage::Bitmap> ReadOutrageBitmap(const string& name) {

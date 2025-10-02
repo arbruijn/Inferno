@@ -176,8 +176,15 @@ namespace Inferno::Render {
         Matrix transform = object.GetTransform();
         transform.Forward(-transform.Forward()); // flip z axis to correct for LH models
 
-        auto model = Resources::GetOutrageModel(Resources::GameTable.Generics[index].ModelName);
+        auto model = Resources::GetOutrageModel(index == MeshBuffer::OUTRAGE_SHIP_INDEX ? 
+            Resources::GameTable.Ships[index - MeshBuffer::OUTRAGE_SHIP_INDEX].ImageName :
+            Resources::GameTable.Generics[index].ModelName);
         if (model == nullptr) return;
+
+        if (!meshHandle.Loaded) {
+            _meshBuffer->LoadOutrageModel(*model, index);
+            Materials->LoadOutrageTextures(model->TextureHandles);
+        }
 
         for (int submodelIndex = 0; submodelIndex < model->Submodels.size(); submodelIndex++) {
             auto& submodel = model->Submodels[submodelIndex];
@@ -194,6 +201,9 @@ namespace Inferno::Render {
             auto world = Matrix::CreateTranslation(submodelOffset) * transform;
 
             using namespace Outrage;
+
+            if (submodel.HasFlag(SubmodelFlag::Custom))
+                continue;
 
             if (submodel.HasFlag(SubmodelFlag::Facing)) {
                 auto smPos = Vector3::Transform(Vector3::Zero, world);
@@ -567,6 +577,11 @@ namespace Inferno::Render {
             case ObjectType::SecretExitReturn:
             case ObjectType::Marker:
             {
+                if (Settings::Editor.Descent3Mode && object.Type == ObjectType::Player) {
+                    DrawOutrageModel(object, cmd, MeshBuffer::OUTRAGE_SHIP_INDEX, false);
+                    DrawOutrageModel(object, cmd, MeshBuffer::OUTRAGE_SHIP_INDEX, true);
+                    break;
+                }
                 auto texOverride = Resources::LookupTexID(object.Render.Model.TextureOverride);
                 DrawModel(cmd, object, object.Render.Model.ID, alpha, texOverride);
                 break;

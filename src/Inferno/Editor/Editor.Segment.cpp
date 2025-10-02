@@ -684,6 +684,8 @@ namespace Inferno::Editor {
     SegID FindContainingSegment(Level& level, const Vector3& point) {
         for (int id = 0; id < level.Segments.size(); id++) {
             auto& seg = level.GetSegment((SegID)id);
+            if (fabsf(seg.Center.x - point.x) > 200 || fabsf(seg.Center.y - point.y) > 200 || fabsf(seg.Center.z - point.z) > 200)
+                continue;
             if (Vector3::Distance(seg.Center, point) > 200) continue;
 
             if (PointInSegment(level, (SegID)id, point))
