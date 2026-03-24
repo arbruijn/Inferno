@@ -8,6 +8,8 @@
 #include <array>
 #include <filesystem>
 #include <random>
+#include <utility>     // std::as_const
+#include <charconv>    // std::from_chars
 
 // Copied from <windows.h> to make SimpleMath happy
 //using UINT = unsigned int;
