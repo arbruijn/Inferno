@@ -1951,7 +1951,7 @@ namespace Inferno::Resources {
                 vfs::Mount(levelFolder);
         }
 
-        vfs::Print();
+        //vfs::Print();
     }
 
     bool MountAddonData(filesystem::path path) {
