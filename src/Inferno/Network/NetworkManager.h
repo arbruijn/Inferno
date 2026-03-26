@@ -3,6 +3,7 @@
 #include "Messages.h"
 #include "Difficulty.h"
 #include "Mission.h"
+#include "Types.h"
 #include <optional>
 #include <unordered_map>
 #include <slikenet/peer.h>
@@ -89,6 +90,12 @@ namespace Inferno::Network {
         const std::unordered_map<uint8_t, RemotePlayerState>& getRemotePlayers() const { return m_remotePlayers; }
         const std::unordered_map<uint8_t, LobbyPlayer>& getLobbyPlayers() const { return m_lobbyPlayers; }
         const std::optional<LobbyGameSelection>& getLobbyGameSelection() const { return m_lobbyGameSelection; }
+        const std::unordered_map<uint8_t, ObjID>& getPlayerObjectIds() const { return m_playerObjectIds; }
+
+        bool hasPlayer(uint8_t playerId) const;
+        void clearPlayerObjectIds();
+        void setPlayerObjectId(uint8_t playerId, ObjID objectId);
+        std::optional<ObjID> getPlayerObjectId(uint8_t playerId) const;
 
         void setHostedGameSelection(const MissionInfo& mission, int level, DifficultyLevel difficulty);
         void startHostedGame();
@@ -137,6 +144,7 @@ namespace Inferno::Network {
         std::unordered_map<uint8_t, SLNet::SystemAddress> m_playerAddresses;
         std::unordered_map<uint8_t, RemotePlayerState> m_remotePlayers;
         std::unordered_map<uint8_t, LobbyPlayer> m_lobbyPlayers;
+        std::unordered_map<uint8_t, ObjID> m_playerObjectIds;
         std::optional<LobbyGameSelection> m_lobbyGameSelection;
     };
 }

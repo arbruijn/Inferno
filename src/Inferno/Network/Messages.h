@@ -20,6 +20,7 @@ namespace Inferno::Network {
     struct PlayerStateMessage {
         uint8_t player_id;
         float position_x, position_y, position_z;
+        int16_t segment;
         float rotation_m11, rotation_m12, rotation_m13;
         float rotation_m21, rotation_m22, rotation_m23;
         float rotation_m31, rotation_m32, rotation_m33;

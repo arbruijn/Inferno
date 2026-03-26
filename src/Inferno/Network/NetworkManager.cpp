@@ -185,6 +185,7 @@ namespace Inferno::Network {
         m_playerAddresses.clear();
         m_remotePlayers.clear();
         m_lobbyPlayers.clear();
+        m_playerObjectIds.clear();
         m_lobbyGameSelection.reset();
     }
 
@@ -442,6 +443,28 @@ namespace Inferno::Network {
     void NetworkManager::broadcastPlayerDeath(const PlayerDeathMessage& death) {
         auto bytes = Serialize(death);
         broadcastMessage(MessageID::PlayerDeath, bytes);
+    }
+
+    bool NetworkManager::hasPlayer(uint8_t playerId) const {
+        return playerId == m_playerId ||
+            m_lobbyPlayers.contains(playerId) ||
+            m_playerAddresses.contains(playerId) ||
+            m_remotePlayers.contains(playerId);
+    }
+
+    void NetworkManager::clearPlayerObjectIds() {
+        m_playerObjectIds.clear();
+    }
+
+    void NetworkManager::setPlayerObjectId(uint8_t playerId, ObjID objectId) {
+        m_playerObjectIds[playerId] = objectId;
+    }
+
+    std::optional<ObjID> NetworkManager::getPlayerObjectId(uint8_t playerId) const {
+        if (auto it = m_playerObjectIds.find(playerId); it != m_playerObjectIds.end())
+            return it->second;
+
+        return std::nullopt;
     }
 
     bool NetworkManager::consumePlayerStateSendTick() {

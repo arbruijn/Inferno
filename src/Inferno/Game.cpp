@@ -47,7 +47,6 @@ namespace Inferno::Game {
         Object NULL_PLAYER{ .Type = ObjectType::Player };
         bool RestartingLevel = false; // restarting the current level
         int LoadingFrameDelay = 0;
-        std::unordered_map<uint8, ObjRef> RemotePlayerObjects;
 
         class Player PlayerLevelStart = {}; // The player state at level start, used for restarting
 
@@ -88,39 +87,37 @@ namespace Inferno::Game {
             return Matrix3x3(Matrix::Lerp(ExpandRotation(start), ExpandRotation(end), t));
         }
 
-        SegID FindRemotePlayerSegment(const Vector3& position) {
-            if (Level.Objects.empty())
-                return SegID::None;
+        void InitializeMultiplayerPlayerObjects() {
+            auto& network = Network::NetworkManager::Instance();
+            network.clearPlayerObjectIds();
 
-            auto segment = TraceSegment(Level, GetPlayerObject().Segment, position);
-            return segment != SegID::None ? segment : GetPlayerObject().Segment;
-        }
+            for (int id = 0; id < Level.Objects.size(); id++) {
+                auto& obj = Level.Objects[id];
+                if (!obj.IsPlayer())
+                    continue;
 
-        ObjRef EnsureRemotePlayerObject(uint8 playerId, const Vector3& position, const Matrix3x3& rotation) {
-            if (auto it = RemotePlayerObjects.find(playerId); it != RemotePlayerObjects.end()) {
-                if (GetObject(it->second))
-                    return it->second;
+                if (obj.ID < 0)
+                    continue;
+
+                const auto playerId = static_cast<uint8>(obj.ID);
+                if (id != (int)Player.Reference.Id) {
+                    InitObject(obj, ObjectType::Player, obj.ID, true);
+                    obj.ID = playerId;
+                    obj.Control.Type = ControlType::Remote;
+                }
+
+                network.setPlayerObjectId(playerId, ObjID(id));
+
+                obj.Faction = Faction::Player;
+                obj.Physics.TurnRollRate = Game::Player.Ship.TurnRollRate;
+                obj.Physics.TurnRollScale = Game::Player.Ship.TurnRollScale;
+                ClearFlag(obj.Flags, ObjectFlag::Dead);
+                if (obj.Lifespan < 0)
+                    obj.Lifespan = MAX_OBJECT_LIFE;
+
+                const bool isAvailable = network.hasPlayer(playerId);
+                obj.Render.Type = isAvailable ? RenderType::Model : RenderType::None;
             }
-
-            const auto segment = FindRemotePlayerSegment(position);
-            if (segment == SegID::None)
-                return {};
-
-            Object remote{};
-            InitObject(remote, ObjectType::Coop, 0, true);
-            remote.Control.Type = ControlType::Remote;
-            remote.Faction = Faction::Player;
-            remote.Position = position;
-            remote.PrevPosition = position;
-            remote.Rotation = rotation;
-            remote.PrevRotation = rotation;
-            remote.Segment = segment;
-
-            auto reference = AddObject(remote);
-            if (reference)
-                RemotePlayerObjects[playerId] = reference;
-
-            return reference;
         }
 
         Network::PlayerStateMessage BuildLocalPlayerState() {
@@ -133,6 +130,7 @@ namespace Inferno::Game {
                 .position_x = playerObj.Position.x,
                 .position_y = playerObj.Position.y,
                 .position_z = playerObj.Position.z,
+                .segment = (int16_t)playerObj.Segment,
                 .rotation_m11 = rotation._11,
                 .rotation_m12 = rotation._12,
                 .rotation_m13 = rotation._13,
@@ -150,17 +148,12 @@ namespace Inferno::Game {
         }
 
         void SyncRemotePlayers() {
-            const auto& remotePlayers = Network::NetworkManager::Instance().getRemotePlayers();
+            auto& network = Network::NetworkManager::Instance();
+            const auto& remotePlayers = network.getRemotePlayers();
+            const auto& playerObjectIds = network.getPlayerObjectIds();
 
-            if (Level.Objects.empty()) {
-                for (const auto& [_, reference] : RemotePlayerObjects) {
-                    if (reference)
-                        FreeObject(reference.Id);
-                }
-
-                RemotePlayerObjects.clear();
+            if (Level.Objects.empty())
                 return;
-            }
 
             for (const auto& [playerId, remoteState] : remotePlayers) {
                 if (!remoteState.hasSnapshot)
@@ -171,7 +164,11 @@ namespace Inferno::Game {
                 const auto t = std::clamp(remoteState.interpolationAlpha, 0.0f, 1.0f);
                 const auto position = Vector3::Lerp(PositionFromMessage(startState), PositionFromMessage(endState), t);
                 const auto rotation = InterpolateRotation(RotationFromMessage(startState), RotationFromMessage(endState), t);
-                auto* object = GetObject(EnsureRemotePlayerObject(playerId, position, rotation));
+                auto objectId = network.getPlayerObjectId(playerId);
+                if (!objectId)
+                    continue;
+
+                auto* object = Level.TryGetObject(*objectId);
                 if (!object)
                     continue;
 
@@ -179,23 +176,20 @@ namespace Inferno::Game {
                 object->PrevRotation = object->Rotation;
                 object->Position = position;
                 object->Rotation = rotation;
+                object->Segment = SegID(endState.segment);
                 object->Physics.Velocity = Vector3(endState.velocity_x, endState.velocity_y, endState.velocity_z);
                 object->Render.Type = remoteState.isDead ? RenderType::None : RenderType::Model;
-
-                const auto segment = FindRemotePlayerSegment(position);
-                if (segment != SegID::None && segment != object->Segment)
-                    RelinkObject(Level, *object, segment);
+                UpdateObjectSegment(Level, *object);
             }
 
-            for (auto it = RemotePlayerObjects.begin(); it != RemotePlayerObjects.end();) {
-                if (!remotePlayers.contains(it->first)) {
-                    if (it->second)
-                        FreeObject(it->second.Id);
-                    it = RemotePlayerObjects.erase(it);
-                }
-                else {
-                    ++it;
-                }
+            for (const auto& [playerId, objectId] : playerObjectIds) {
+                auto* object = Level.TryGetObject(objectId);
+                if (!object)
+                    continue;
+
+                const bool isAvailable = network.hasPlayer(playerId);
+                if (!isAvailable)
+                    object->Render.Type = RenderType::None;
             }
         }
     }
@@ -1267,7 +1261,6 @@ namespace Inferno::Game {
 
     bool StartLevel() {
         SPDLOG_INFO("Starting level");
-        RemotePlayerObjects.clear();
         Editor::SetPlayerStartIDs(Level);
 
         if (!CheckForPlayerStart(Level))
@@ -1346,12 +1339,13 @@ namespace Inferno::Game {
         Level.Rooms = CreateRooms(Level, player.Segment);
         Level.HasBoss = false;
         Graphics::NotifyLevelChanged(); // regenerate level meshes
+        const bool isMultiplayer = Network::NetworkManager::Instance().isConnected();
 
         // init objects
         for (int id = 0; id < Level.Objects.size(); id++) {
             auto& obj = Level.Objects[id];
 
-            if ((obj.IsPlayer() && id != 0) || obj.IsCoop()) {
+            if (!isMultiplayer && ((obj.IsPlayer() && id != 0) || obj.IsCoop())) {
                 obj.Lifespan = -1; // Remove non-player 0 starts (no multiplayer)
                 obj.Render.Type = RenderType::None; // Make invisible
                 SetFlag(obj.Flags, ObjectFlag::Dead);
@@ -1403,6 +1397,9 @@ namespace Inferno::Game {
 
             FixObjectPosition(obj);
         }
+
+        if (isMultiplayer)
+            InitializeMultiplayerPlayerObjects();
 
         MarkAmbientSegments(SoundFlag::AmbientLava, TextureFlag::Volatile);
         MarkAmbientSegments(SoundFlag::AmbientWater, TextureFlag::Water);

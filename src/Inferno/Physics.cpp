@@ -340,7 +340,7 @@ namespace Inferno {
                     break;
                 }
                 case ObjectType::Player: {
-                    if (target.ID > 0) return CollisionType::None; // Only hit player 0 in singleplayer
+                    if (target.Render.Type == RenderType::None) return CollisionType::None; // No hit for hidden players
                     if (src.Parent.Id == ObjID(0)) return CollisionType::None; // Don't hit the player with their own shots
                     if (WeaponIsMine((WeaponID)src.ID) && src.Control.Weapon.AliveTime < Game::MINE_ARM_TIME)
                         return CollisionType::None; // Mines can't hit the player until they arm
