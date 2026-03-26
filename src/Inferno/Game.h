@@ -47,7 +47,9 @@ namespace Inferno::Game {
     inline int64 MissionTimestamp = 0;
 
     // Only single player for now
-    inline class Player Player = {};
+    constexpr int MAX_PLAYERS = 32;
+    inline class Player Players[MAX_PLAYERS] {};
+    inline class Player& Player = Players[0];
     inline ObjRef DeathCamera = {};
     inline Camera MainCamera;
 

@@ -236,10 +236,12 @@ if(MSVC)
     add_compile_options(/W4 /permissive- /utf-8)
 else()
     add_compile_options(-Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers
-	-Wno-switch -Wno-sign-compare -Wno-narrowing -Wno-ignored-qualifiers
-	-Wno-implicit-const-int-float-conversion -Wno-unused-private-field
-	-Wno-unknown-pragmas -Wno-comment -Wno-nontrivial-memcall
-        -Wno-missing-braces)
+        -Wno-switch -Wno-sign-compare -Wno-narrowing -Wno-ignored-qualifiers
+        -Wno-implicit-const-int-float-conversion -Wno-unused-private-field
+        -Wno-unknown-pragmas -Wno-comment -Wno-nontrivial-memcall
+        -Wno-missing-braces -Wno-format-security -Wno-format -Wno-braced-scalar-init
+        -Wno-logical-op-parentheses -Wno-unused-value -Wno-macro-redefined
+    )
     if(NOT MINGW)
         add_compile_options(-Wno-changes-meaning)
     endif()

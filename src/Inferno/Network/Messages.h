@@ -12,6 +12,7 @@ namespace Inferno::Network {
         PlayerState = 102,
         PlayerDeath = 103,
         GameStart = 104,
+        PlayerInfo = 105,
     };
 
     // Player state update message
@@ -29,6 +30,11 @@ namespace Inferno::Network {
     struct PlayerDeathMessage {
         uint8_t player_id;
         bool exploded; // Player exploded after death
+    };
+
+    struct PlayerInfoMessage {
+        uint8_t player_id;
+        std::string name;
     };
 
     // Serialization functions using alpaca

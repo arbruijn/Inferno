@@ -22,6 +22,7 @@
 #include "Game.UI.ScoreScreen.h"
 #include "Game.Visibility.h"
 #include "Game.Wall.h"
+#include "Network/NetworkManager.h"
 #include "Graphics.Debug.h"
 #include "Graphics.h"
 #include "Graphics/Render.MainMenu.h"
@@ -46,8 +47,157 @@ namespace Inferno::Game {
         Object NULL_PLAYER{ .Type = ObjectType::Player };
         bool RestartingLevel = false; // restarting the current level
         int LoadingFrameDelay = 0;
+        std::unordered_map<uint8, ObjRef> RemotePlayerObjects;
 
         class Player PlayerLevelStart = {}; // The player state at level start, used for restarting
+
+        Vector3 PositionFromMessage(const Network::PlayerStateMessage& state) {
+            return { state.position_x, state.position_y, state.position_z };
+        }
+
+        Matrix3x3 RotationFromMessage(const Network::PlayerStateMessage& state) {
+            Matrix3x3 rotation;
+            rotation._11 = state.rotation_m11;
+            rotation._12 = state.rotation_m12;
+            rotation._13 = state.rotation_m13;
+            rotation._21 = state.rotation_m21;
+            rotation._22 = state.rotation_m22;
+            rotation._23 = state.rotation_m23;
+            rotation._31 = state.rotation_m31;
+            rotation._32 = state.rotation_m32;
+            rotation._33 = state.rotation_m33;
+            rotation.Normalize();
+            return rotation;
+        }
+
+        Matrix ExpandRotation(const Matrix3x3& rotation) {
+            Matrix matrix = Matrix::Identity;
+            matrix._11 = rotation._11;
+            matrix._12 = rotation._12;
+            matrix._13 = rotation._13;
+            matrix._21 = rotation._21;
+            matrix._22 = rotation._22;
+            matrix._23 = rotation._23;
+            matrix._31 = rotation._31;
+            matrix._32 = rotation._32;
+            matrix._33 = rotation._33;
+            return matrix;
+        }
+
+        Matrix3x3 InterpolateRotation(const Matrix3x3& start, const Matrix3x3& end, float t) {
+            return Matrix3x3(Matrix::Lerp(ExpandRotation(start), ExpandRotation(end), t));
+        }
+
+        SegID FindRemotePlayerSegment(const Vector3& position) {
+            if (Level.Objects.empty())
+                return SegID::None;
+
+            auto segment = TraceSegment(Level, GetPlayerObject().Segment, position);
+            return segment != SegID::None ? segment : GetPlayerObject().Segment;
+        }
+
+        ObjRef EnsureRemotePlayerObject(uint8 playerId, const Vector3& position, const Matrix3x3& rotation) {
+            if (auto it = RemotePlayerObjects.find(playerId); it != RemotePlayerObjects.end()) {
+                if (GetObject(it->second))
+                    return it->second;
+            }
+
+            const auto segment = FindRemotePlayerSegment(position);
+            if (segment == SegID::None)
+                return {};
+
+            Object remote{};
+            InitObject(remote, ObjectType::Coop, 0, true);
+            remote.Control.Type = ControlType::Remote;
+            remote.Faction = Faction::Player;
+            remote.Position = position;
+            remote.PrevPosition = position;
+            remote.Rotation = rotation;
+            remote.PrevRotation = rotation;
+            remote.Segment = segment;
+
+            auto reference = AddObject(remote);
+            if (reference)
+                RemotePlayerObjects[playerId] = reference;
+
+            return reference;
+        }
+
+        Network::PlayerStateMessage BuildLocalPlayerState() {
+            const auto& playerObj = GetPlayerObject();
+            const auto& rotation = playerObj.Rotation;
+            const auto& velocity = playerObj.Physics.Velocity;
+
+            return {
+                .player_id = Network::NetworkManager::Instance().getPlayerId(),
+                .position_x = playerObj.Position.x,
+                .position_y = playerObj.Position.y,
+                .position_z = playerObj.Position.z,
+                .rotation_m11 = rotation._11,
+                .rotation_m12 = rotation._12,
+                .rotation_m13 = rotation._13,
+                .rotation_m21 = rotation._21,
+                .rotation_m22 = rotation._22,
+                .rotation_m23 = rotation._23,
+                .rotation_m31 = rotation._31,
+                .rotation_m32 = rotation._32,
+                .rotation_m33 = rotation._33,
+                .velocity_x = velocity.x,
+                .velocity_y = velocity.y,
+                .velocity_z = velocity.z,
+                .animation_state = Player.IsDead ? 1 : 0,
+            };
+        }
+
+        void SyncRemotePlayers() {
+            const auto& remotePlayers = Network::NetworkManager::Instance().getRemotePlayers();
+
+            if (Level.Objects.empty()) {
+                for (const auto& [_, reference] : RemotePlayerObjects) {
+                    if (reference)
+                        FreeObject(reference.Id);
+                }
+
+                RemotePlayerObjects.clear();
+                return;
+            }
+
+            for (const auto& [playerId, remoteState] : remotePlayers) {
+                if (!remoteState.hasSnapshot)
+                    continue;
+
+                const auto startState = remoteState.hasPreviousSnapshot ? remoteState.previousSnapshot : remoteState.latestSnapshot;
+                const auto endState = remoteState.latestSnapshot;
+                const auto t = std::clamp(remoteState.interpolationAlpha, 0.0f, 1.0f);
+                const auto position = Vector3::Lerp(PositionFromMessage(startState), PositionFromMessage(endState), t);
+                const auto rotation = InterpolateRotation(RotationFromMessage(startState), RotationFromMessage(endState), t);
+                auto* object = GetObject(EnsureRemotePlayerObject(playerId, position, rotation));
+                if (!object)
+                    continue;
+
+                object->PrevPosition = object->Position;
+                object->PrevRotation = object->Rotation;
+                object->Position = position;
+                object->Rotation = rotation;
+                object->Physics.Velocity = Vector3(endState.velocity_x, endState.velocity_y, endState.velocity_z);
+                object->Render.Type = remoteState.isDead ? RenderType::None : RenderType::Model;
+
+                const auto segment = FindRemotePlayerSegment(position);
+                if (segment != SegID::None && segment != object->Segment)
+                    RelinkObject(Level, *object, segment);
+            }
+
+            for (auto it = RemotePlayerObjects.begin(); it != RemotePlayerObjects.end();) {
+                if (!remotePlayers.contains(it->first)) {
+                    if (it->second)
+                        FreeObject(it->second.Id);
+                    it = RemotePlayerObjects.erase(it);
+                }
+                else {
+                    ++it;
+                }
+            }
+        }
     }
 
     void SetTimeScale(float scale, float transitionSpeed) {
@@ -386,6 +536,7 @@ namespace Inferno::Game {
 
         switch (RequestedState) {
             case GameState::MainMenu: {
+                Network::NetworkManager::Instance().disconnect();
                 Sound::StopAllSounds();
                 Game::Level = {};
                 Game::Mission = {};
@@ -641,6 +792,7 @@ namespace Inferno::Game {
 
     void Update(float dt) {
         Game::FrameTime = 0;
+        auto& network = Network::NetworkManager::Instance();
 
         // Stop time when not in game or in editor. Editor uses gametime to animate vclips.
         if (Game::State == GameState::Game || Game::State == GameState::Editor || Game::State == GameState::EscapeSequence) {
@@ -673,6 +825,7 @@ namespace Inferno::Game {
         HandleInput(dt);
 
         Graphics::BeginFrame(); // enable debug calls during updates
+        network.update(dt);
 
         CheckGameStateChange();
 
@@ -736,6 +889,10 @@ namespace Inferno::Game {
 
             case GameState::Game:
                 LerpAmount = GameUpdate(dt);
+                if (network.isConnected() && network.consumePlayerStateSendTick() && !Player.IsDead && !Level.Objects.empty())
+                    network.broadcastPlayerState(BuildLocalPlayerState());
+
+                SyncRemotePlayers();
                 //UpdateCommsMessage();
                 SetActiveCamera(Game::MainCamera);
                 Game::MainCamera.SetFov(Settings::Graphics.FieldOfView);
@@ -1110,6 +1267,7 @@ namespace Inferno::Game {
 
     bool StartLevel() {
         SPDLOG_INFO("Starting level");
+        RemotePlayerObjects.clear();
         Editor::SetPlayerStartIDs(Level);
 
         if (!CheckForPlayerStart(Level))

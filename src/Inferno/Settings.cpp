@@ -770,6 +770,7 @@ namespace Inferno {
         node["UseSoundOcclusion"] << settings.UseSoundOcclusion;
         node["UseTextureCaching"] << settings.UseTextureCaching;
         node["RecentMission"] << settings.RecentMission;
+        node["PlayerName"] << settings.PlayerName;
         node["EnableDevHotkeys"] << settings.EnableDevHotkeys;
 
         SavePriorities(node["PrimaryPriority"], settings.PrimaryPriority);
@@ -813,7 +814,11 @@ namespace Inferno {
         ReadValue2(node, "UseSoundOcclusion", settings.UseSoundOcclusion);
         ReadValue2(node, "UseTextureCaching", settings.UseTextureCaching);
         ReadValue2(node, "RecentMission", settings.RecentMission);
+        ReadValue2(node, "PlayerName", settings.PlayerName);
         ReadValue2(node, "EnableDevHotkeys", settings.EnableDevHotkeys);
+
+        if (settings.PlayerName.empty())
+            settings.PlayerName = "Player";
 
         ReadPriorities(node["PrimaryPriority"], settings.PrimaryPriority);
         ReadPriorities(node["SecondaryPriority"], settings.SecondaryPriority);

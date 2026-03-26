@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Messages.h"
+#include <optional>
+#include <unordered_map>
 #include <slikenet/peer.h>
 #include <slikenet/MessageIdentifiers.h>
 #include <slikenet/BitStream.h>
@@ -11,6 +13,22 @@
 
 namespace Inferno::Network {
     constexpr uint16_t LISTEN_PORT = 12345; // Default port for multiplayer
+
+    struct RemotePlayerState {
+        uint8_t playerId = 0xFF;
+        PlayerStateMessage previousSnapshot{};
+        PlayerStateMessage latestSnapshot{};
+        float interpolationAlpha = 1.0f;
+        bool hasSnapshot = false;
+        bool hasPreviousSnapshot = false;
+        bool isDead = false;
+        bool exploded = false;
+    };
+
+    struct LobbyPlayer {
+        uint8_t playerId = 0xFF;
+        std::string name;
+    };
 
     class NetworkManager {
     public:
@@ -39,6 +57,9 @@ namespace Inferno::Network {
         // Send player death to all peers
         void broadcastPlayerDeath(const PlayerDeathMessage& death);
 
+        // Returns true when the game should send another local player snapshot.
+        bool consumePlayerStateSendTick();
+
         // Check if currently hosting
         bool isHost() const { return m_isHost; }
 
@@ -47,6 +68,17 @@ namespace Inferno::Network {
 
         // Get local player ID (0 for host, 1+ for clients)
         uint8_t getPlayerId() const { return m_playerId; }
+
+        void setLocalPlayerName(std::string_view name);
+        const std::string& getLocalPlayerName() const { return m_localPlayerName; }
+
+        // Returns the local IPv4/IPv6 addresses reported by the active peer.
+        std::vector<std::string> getLocalAddresses() const;
+
+        uint16_t getPort() const { return m_port; }
+
+        const std::unordered_map<uint8_t, RemotePlayerState>& getRemotePlayers() const { return m_remotePlayers; }
+        const std::unordered_map<uint8_t, LobbyPlayer>& getLobbyPlayers() const { return m_lobbyPlayers; }
 
     private:
         NetworkManager();
@@ -61,6 +93,14 @@ namespace Inferno::Network {
         void handlePlayerState(SLNet::Packet* packet);
         void handlePlayerDeath(SLNet::Packet* packet);
         void handleGameStart(SLNet::Packet* packet);
+        void handlePlayerInfo(SLNet::Packet* packet);
+        uint8_t assignPlayerId(const SLNet::SystemAddress& address);
+        std::optional<uint8_t> findPlayerId(const SLNet::SystemAddress& address) const;
+        void removeRemotePlayer(uint8_t playerId);
+        void setLobbyPlayer(uint8_t playerId, std::string name);
+        void sendExistingLobbyPlayers(const SLNet::SystemAddress& target);
+        void sendLocalPlayerInfo();
+        void updateRemotePlayers(float dt);
 
         // Send a raw message to all connected peers
         void broadcastMessage(MessageID id, const std::vector<uint8_t>& data);
@@ -71,9 +111,16 @@ namespace Inferno::Network {
         SLNet::RakPeerInterface* m_peer = nullptr;
         bool m_isHost = false;
         uint8_t m_playerId = 0;
+        std::string m_localPlayerName = "Player";
         std::queue<SLNet::Packet*> m_packetQueue;
         std::mutex m_queueMutex;
         float m_updateTimer = 0.0f;
+        bool m_shouldSendPlayerState = false;
         const float m_updateRate = 1.0f / 30.0f; // 30 updates per second
+        uint16_t m_port = LISTEN_PORT;
+        uint8_t m_nextPlayerId = 1;
+        std::unordered_map<uint8_t, SLNet::SystemAddress> m_playerAddresses;
+        std::unordered_map<uint8_t, RemotePlayerState> m_remotePlayers;
+        std::unordered_map<uint8_t, LobbyPlayer> m_lobbyPlayers;
     };
 }

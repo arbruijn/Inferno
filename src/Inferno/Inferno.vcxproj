@@ -247,6 +247,7 @@
     <ClCompile Include="Icosphere.cpp" />
     <ClCompile Include="Game.UI.Options.cpp" />
     <ClCompile Include="Mods.cpp" />
+    <ClCompile Include="Multiplayer.UI.cpp" />
     <ClCompile Include="Graphics\TextureAllocator.cpp" />
     <ClCompile Include="TextureCache.cpp" />
     <ClCompile Include="VirtualFileSystem.cpp" />

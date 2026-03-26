@@ -6,6 +6,7 @@
 #include "Game.UI.ScoreScreen.h"
 #include "gsl/pointers.h"
 #include "Input.h"
+#include "Network/NetworkManager.h"
 #include "Types.h"
 #include "Utility.h"
 #include "Resources.h"
@@ -387,6 +388,9 @@ namespace Inferno::UI {
             panel->AddChild<Button>("Load Game", [] {
                 ShowScreen(make_unique<LoadDialog>());
             });
+            panel->AddChild<Button>("Multiplayer", [] {
+                ShowMultiplayerDialog();
+            });
             panel->AddChild<Button>("Options", [] {
                 ShowScreen(make_unique<OptionsMenu>());
             });
@@ -552,6 +556,17 @@ namespace Inferno::UI {
             panel->AddChild<Button>("photo mode", [] {
                 Game::SetState(GameState::PhotoMode);
             }, AlignH::Center);
+
+            if (Network::NetworkManager::Instance().isConnected()) {
+                panel->AddChild<Button>("Disconnect", [this] {
+                    auto confirmDialog = make_unique<ConfirmDialog>("leave multiplayer session?");
+                    confirmDialog->CloseCallback = [this](CloseState state) {
+                        if (state == CloseState::Accept)
+                            Game::SetState(GameState::MainMenu);
+                    };
+                    ShowScreen(std::move(confirmDialog));
+                }, AlignH::Center);
+            }
 
             panel->AddChild<Button>("Quit", [this] {
                 auto confirmDialog = make_unique<ConfirmDialog>("abort mission?");

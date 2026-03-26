@@ -8,6 +8,7 @@
 #include "Game.Weapon.h"
 #include "HUD.h"
 #include "Input.h"
+#include "Network/NetworkManager.h"
 #include "Physics.h"
 #include "Resources.h"
 #include "Settings.h"
@@ -840,6 +841,14 @@ namespace Inferno {
                 Game::ResetTints();
                 Shields = 0;
                 Energy = 0;
+
+                auto& network = Network::NetworkManager::Instance();
+                if (network.isConnected()) {
+                    network.broadcastPlayerDeath({
+                        .player_id = network.getPlayerId(),
+                        .exploded = Exploded,
+                    });
+                }
             }
 
             player->HitPoints = Shields;

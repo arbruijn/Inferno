@@ -6,6 +6,7 @@ namespace Inferno::UI {
     void ShowPauseDialog();
     void ShowScoreScreen(const ScoreInfo& score, bool secretLevel);
     void ShowMainMenu();
+    void ShowMultiplayerDialog();
 
     // missionFailed indicates the player ran out of lives
     void ShowFailedEscapeDialog(bool missionFailed);

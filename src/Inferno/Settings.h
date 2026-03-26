@@ -241,6 +241,7 @@ namespace Inferno {
         bool UseSoundOcclusion = false;
         bool UseTextureCaching = false;
         string RecentMission; // Path of the most recently played mission
+        string PlayerName = "Player";
         bool EnableDevHotkeys = false;
 
         Array<uint8, 13> PrimaryPriority = DEFAULT_PRIMARY_PRIORITY;

@@ -127,8 +127,7 @@ target_precompile_headers(Inferno PRIVATE pch.h)
 
 find_package(OpenMP REQUIRED)
 target_link_libraries(Inferno PRIVATE OpenMP::OpenMP_CXX)
-target_link_libraries(Inferno PRIVATE zip pcm winmm x3daudio1_7 xaudio2_9 gomp
-	/mingw64/lib/libgomp.a
+target_link_libraries(Inferno PRIVATE zip pcm winmm x3daudio1_7 xaudio2_9
 	${CMAKE_SOURCE_DIR}/platform/mingw/lib/dxcompiler.dll)
 target_link_options(Inferno PRIVATE -fopenmp)
 
@@ -143,6 +142,7 @@ target_link_libraries(Inferno PRIVATE
     ryml::ryml
     magic_enum::magic_enum
     SLikeNetLibStatic
+    iphlpapi
 )
 
 # SLikeNet platform dependencies
