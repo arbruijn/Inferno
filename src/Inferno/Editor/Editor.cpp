@@ -651,7 +651,7 @@ namespace Inferno::Editor {
             }
         }
 
-        void Commands::GoToBoss() {
+        void GoToBoss() {
             if (auto boss = Seq::findIndex(Game::Level.Objects, IsBossRobot)) {
                 Selection.SetSelection((ObjID)*boss);
                 FocusObject();
@@ -706,10 +706,10 @@ namespace Inferno::Editor {
 
         void StartExternalGame() {
             // Start the child process. 
-            STARTUPINFO si{};
+            STARTUPINFOW si{};
             PROCESS_INFORMATION pi{};
 
-            if (!CreateProcess(GetGameExecutablePath().c_str(),
+            if (!CreateProcessW(GetGameExecutablePath().c_str(),
                                nullptr, // Command line
                                nullptr, // Process handle not inheritable
                                nullptr, // Thread handle not inheritable

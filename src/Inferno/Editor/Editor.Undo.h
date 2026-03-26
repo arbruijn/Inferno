@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <list>
 
 #include "Types.h"
 #include "Level.h"

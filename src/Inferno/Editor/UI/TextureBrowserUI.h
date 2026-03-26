@@ -37,7 +37,7 @@ namespace Inferno::Editor {
         Label = BIT(28),
         Monitor = BIT(29),
         Stripes = BIT(30),
-        Moving = BIT(31),
+        Moving = (1ULL << 31),
         All = 0xFFFFFFFF
     };
 

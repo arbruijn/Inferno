@@ -28,6 +28,16 @@ if(LINUX)
     target_link_directories(InfernoCore PUBLIC ${VKD3D_LIBRARY_DIRS})
     target_compile_definitions(InfernoCore PUBLIC PLATFORM_LINUX)
     target_compile_options(InfernoCore PRIVATE -Wno-unused-variable -Wno-unused-function)
+
+elseif(MINGW)
+    target_include_directories(InfernoCore SYSTEM PUBLIC
+        ${PLATFORM_INCLUDE_DIR}
+        ${DIRECTXTK12_SOURCE_DIR}/Inc
+        ${directxmath_SOURCE_DIR}/Inc
+    )
+    target_link_libraries(InfernoCore PUBLIC DirectXTex)
+    target_compile_options(InfernoCore PRIVATE -Wno-unused-variable -Wno-unused-function)
+
 else()
     find_package(directxtk12 CONFIG REQUIRED)
     find_package(directxtex CONFIG REQUIRED)

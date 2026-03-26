@@ -46,7 +46,7 @@ namespace Inferno::Editor {
     template<class...TArgs>
     void SetStatusMessageWarn(const string_view format, TArgs&&...args) {
         SetStatusMessage(format, std::forward<TArgs>(args)...);
-        PlaySound(Widen("SystemAsterisk").c_str(), nullptr, SND_ASYNC);
+        PlaySoundW(Widen("SystemAsterisk").c_str(), nullptr, SND_ASYNC);
     }
 
     void OpenRecentOrEmpty();

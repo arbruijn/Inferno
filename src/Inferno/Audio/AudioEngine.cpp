@@ -411,7 +411,7 @@ HRESULT AudioEngine::Impl::Reset(const WAVEFORMATEX* wfx, const wchar_t* deviceI
     //
     // Create XAudio2 engine
     //
-    HRESULT hr = XAudio2Create(xaudio2.ReleaseAndGetAddressOf(), 0u);
+    HRESULT hr = XAudio2Create(xaudio2.ReleaseAndGetAddressOf(), 0u, XAUDIO2_DEFAULT_PROCESSOR);
     if (FAILED(hr))
         return hr;
 

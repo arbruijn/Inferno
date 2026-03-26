@@ -1407,7 +1407,7 @@ namespace Inferno::Resources {
         IndexedMaterials.ExpandAnimatedFrames();
     }
 
-    void Resources::ExpandAnimatedFrames(TexID id) {
+    void ExpandAnimatedFrames(TexID id) {
         IndexedMaterials.ExpandAnimatedFrames(id);
     }
 
@@ -1498,12 +1498,12 @@ namespace Inferno::Resources {
         return nullptr;
     }
 
-    MaterialInfo* Resources::TryGetMaterial(TexID id) {
+    MaterialInfo* TryGetMaterial(TexID id) {
         if (!Seq::inRange(IndexedMaterials.Data(), (int)id)) return nullptr;
         return &IndexedMaterials.Data()[(int)id];
     }
 
-    span<MaterialInfo> Resources::GetAllMaterials() {
+    span<MaterialInfo> GetAllMaterials() {
         return IndexedMaterials.Data();
     }
 
@@ -1893,7 +1893,7 @@ namespace Inferno::Resources {
         }
     }
 
-    void Resources::MountLevel(const Level& level, const filesystem::path& missionPath) {
+    void MountLevel(const Level& level, const filesystem::path& missionPath) {
         vfs::Unmount();
 
         if (level.IsDescent1()) {
@@ -1954,7 +1954,7 @@ namespace Inferno::Resources {
         vfs::Print();
     }
 
-    bool Resources::MountAddonData(filesystem::path path) {
+    bool MountAddonData(filesystem::path path) {
         // Then check for packaged zips
         path.replace_extension(".zip");
 
@@ -1967,7 +1967,7 @@ namespace Inferno::Resources {
         return false;
     }
 
-    void Resources::UnmountAddonData() {
+    void UnmountAddonData() {
         if (_addonData) {
             SPDLOG_INFO("Unmounting addon data {}", _addonData->Path().string());
             _addonData = {};

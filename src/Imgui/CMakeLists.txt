@@ -33,9 +33,19 @@ if(LINUX)
         ${VKD3D_INCLUDE_DIRS}
     )
     target_link_directories(InfernoImgui PUBLIC ${VKD3D_LIBRARY_DIRS})
-    target_compile_definitions(InfernoImgui PUBLIC
-        IMGUI_IMPL_WIN32_DISABLE_GAMEPAD
+    #target_compile_definitions(InfernoImgui PUBLIC
+    #    IMGUI_IMPL_WIN32_DISABLE_GAMEPAD
+    #)
+
+elseif(MINGW)
+    target_include_directories(InfernoImgui SYSTEM PUBLIC
+        ${PLATFORM_INCLUDE_DIR}
+        ${DIRECTXTK12_SOURCE_DIR}/Inc
+        ${directxmath_SOURCE_DIR}/Inc
     )
+    #target_compile_definitions(InfernoImgui PUBLIC
+    #    IMGUI_IMPL_WIN32_DISABLE_GAMEPAD
+    #)
 endif()
 
 if(MSVC)

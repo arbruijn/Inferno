@@ -246,7 +246,7 @@ namespace Inferno {
 
         //m_fenceEvent.Attach(CreateEventEx(nullptr, nullptr, 0, EVENT_MODIFY_STATE | SYNCHRONIZE));
         //if (!m_fenceEvent.IsValid())
-        //    throw std::exception("CreateEvent");
+        //    throw std::runtime_error("CreateEvent");
 
         //CheckMsaaSupport(2, IntermediateFormat);
         //CheckMsaaSupport(4, IntermediateFormat);
@@ -264,7 +264,7 @@ namespace Inferno {
     // relevant swap chain flag cannot be changed with ResizeBuffers.
     void DeviceResources::CreateWindowSizeDependentResources(bool forceSwapChainRebuild) {
         if (!m_window)
-            throw std::exception("Call SetWindow with a valid Win32 window handle");
+            throw std::runtime_error("Call SetWindow with a valid Win32 window handle");
 
         WaitForGpu(); // Wait until all previous GPU work is complete.
 
@@ -547,7 +547,7 @@ namespace Inferno {
                 }
 
                 // Check to see if the adapter supports Direct3D 12, but don't create the actual device yet.
-                if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), m_d3dMinFeatureLevel, _uuidof(ID3D12Device), nullptr))) {
+                if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), m_d3dMinFeatureLevel, __uuidof(ID3D12Device), nullptr))) {
                     SPDLOG_INFO("Direct3D Adapter ({}): VID:{:x}, PID:{:x} - {}", adapterIndex, desc.VendorId, desc.DeviceId, Narrow(desc.Description));
                     break;
                 }
@@ -569,7 +569,7 @@ namespace Inferno {
                 }
 
                 // Check to see if the adapter supports Direct3D 12, but don't create the actual device yet.
-                if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), m_d3dMinFeatureLevel, _uuidof(ID3D12Device), nullptr))) {
+                if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), m_d3dMinFeatureLevel, __uuidof(ID3D12Device), nullptr))) {
                     SPDLOG_INFO("Direct3D Adapter ({}): VID:{:x}, PID:{:x} - {}", adapterIndex, desc.VendorId, desc.DeviceId, Narrow(desc.Description));
                     break;
                 }
@@ -580,7 +580,7 @@ namespace Inferno {
         if (!adapter) {
             // Try WARP12 instead
             if (FAILED(m_dxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(adapter.ReleaseAndGetAddressOf())))) {
-                throw std::exception("WARP12 not available. Enable the 'Graphics Tools' optional feature");
+                throw std::runtime_error("WARP12 not available. Enable the 'Graphics Tools' optional feature");
             }
 
             OutputDebugStringA("Direct3D Adapter - WARP12\n");
@@ -588,7 +588,7 @@ namespace Inferno {
 #endif
 
         if (!adapter)
-            throw std::exception("No Direct3D 12 device found");
+            throw std::runtime_error("No Direct3D 12 device found");
 
         *ppAdapter = adapter.Detach();
     }

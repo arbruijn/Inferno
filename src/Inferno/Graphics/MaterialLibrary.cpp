@@ -848,8 +848,9 @@ namespace Inferno::Render {
     void MaterialLibrary::ResetMaterial(Material2D& material) {
         if (material.ID >= TexID(2900) && material.ID < TexID(3000)) return; // reserved range
 
-        //auto id = material.ID;
-        material = { .ID = material.ID }; // mark the material as unused
+        auto id = material.ID;
+        material = Material2D{}; // mark the material as unused
+        material.ID = id;
 
         // Update the upload to use the new handles
         for (int i = 0; i < Material2D::Count; i++)

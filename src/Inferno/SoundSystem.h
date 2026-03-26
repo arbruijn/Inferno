@@ -1,6 +1,11 @@
 #pragma once
 #include <chrono>
+#include <map>
+#if 0 //def __MINGW32__
+#include "AudioStub.h"
+#else
 #include "Audio/Audio.h"
+#endif
 #include "Object.h"
 #include "SoundTypes.h"
 #include "Utility.h"

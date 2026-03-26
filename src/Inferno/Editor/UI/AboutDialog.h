@@ -31,7 +31,7 @@ namespace Inferno::Editor {
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 0.5f, 0.75f, 1, 0.15f });
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, { 0.5f, 0.75f, 1, 0.30f });
             if (ImGui::SmallButton("Visit Project Page"))
-                ShellExecute(nullptr, Widen("open").c_str(), Widen("https://github.com/nbayazes/Inferno").c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+                ShellExecuteW(nullptr, Widen("open").c_str(), Widen("https://github.com/nbayazes/Inferno").c_str(), nullptr, nullptr, SW_SHOWNORMAL);
             ImGui::PopStyleColor(4);
 
             ImGui::BeginChild("closebtns", { 0, 32 * Shell::DpiScale });

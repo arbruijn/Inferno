@@ -48,7 +48,7 @@ set(SHADER_SOURCES
 
 set(COMPILED_SHADERS)
 
-if(DXC_EXECUTABLE AND LINUX)
+if(DXC_EXECUTABLE AND (LINUX OR MINGW))
     foreach(SHADER ${SHADER_SOURCES})
         get_filename_component(SHADER_NAME ${SHADER} NAME_WE)
 
@@ -97,7 +97,13 @@ if(DXC_EXECUTABLE AND LINUX)
     endforeach()
 endif()
 
-add_custom_target(CompileShaders ALL DEPENDS ${COMPILED_SHADERS})
+if(COMPILED_SHADERS)
+    add_custom_target(CompileShaders ALL DEPENDS ${COMPILED_SHADERS})
+endif()
+
+add_library(zip STATIC zip/zip.c)
+
+add_library(pcm STATIC Audio/pcm/stb_vorbis.c)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Executable
@@ -107,13 +113,24 @@ add_executable(Inferno
     ${INFERNO_HEADERS}
 )
 
-add_dependencies(Inferno CompileShaders)
+if(COMPILED_SHADERS)
+    add_dependencies(Inferno CompileShaders)
+endif()
 
 target_include_directories(Inferno PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../vendor
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/..
 )
+
+target_precompile_headers(Inferno PRIVATE pch.h)
+
+find_package(OpenMP REQUIRED)
+target_link_libraries(Inferno PRIVATE OpenMP::OpenMP_CXX)
+target_link_libraries(Inferno PRIVATE zip pcm winmm x3daudio1_7 xaudio2_9 gomp
+	/mingw64/lib/libgomp.a
+	${CMAKE_SOURCE_DIR}/platform/mingw/lib/dxcompiler.dll)
+target_link_options(Inferno PRIVATE -fopenmp)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Link libraries
@@ -125,7 +142,6 @@ target_link_libraries(Inferno PRIVATE
     spdlog::spdlog
     ryml::ryml
     magic_enum::magic_enum
-    SDL3::SDL3
 )
 
 # lodepng
@@ -145,6 +161,7 @@ if(LINUX)
     )
 
     target_link_libraries(Inferno PRIVATE
+        SDL3::SDL3
         Vulkan::Vulkan
         ${VKD3D_LIBRARIES}
         ${VKD3D_UTILS_LIBRARIES}
@@ -167,6 +184,32 @@ if(LINUX)
         -Wno-unused-function
         -Wno-missing-field-initializers
     )
+
+elseif(MINGW)
+    target_include_directories(Inferno SYSTEM PRIVATE
+        ${PLATFORM_INCLUDE_DIR}
+        ${DIRECTXTK12_SOURCE_DIR}/Inc
+        ${directxmath_SOURCE_DIR}/Inc
+        ${d3d12memalloc_SOURCE_DIR}/include
+    )
+
+    target_link_libraries(Inferno PRIVATE
+        SDL3::SDL3
+        DirectXTex
+        DirectXTK12Lib
+        D3D12MALib
+        d3d12
+        dxgi
+        dwmapi
+        shlwapi
+    )
+
+    target_compile_options(Inferno PRIVATE
+        -Wno-unused-variable
+        -Wno-unused-function
+        -Wno-missing-field-initializers
+    )
+
 else()
     find_package(d3d12-memory-allocator CONFIG REQUIRED)
     find_package(directx-headers CONFIG REQUIRED)
@@ -191,7 +234,7 @@ endif()
 # ─────────────────────────────────────────────────────────────────────────────
 install(TARGETS Inferno RUNTIME DESTINATION bin)
 
-if(LINUX AND DXC_EXECUTABLE)
+if((LINUX OR MINGW) AND DXC_EXECUTABLE AND COMPILED_SHADERS)
     install(DIRECTORY ${SHADER_OUTPUT_DIR}/
         DESTINATION bin/shaders/bin
         FILES_MATCHING PATTERN "*.bin")

@@ -199,12 +199,12 @@ namespace Inferno::Render {
         ToneMapping = make_unique<PostFx::ToneMapping>();
         MaterialInfoUploadBuffer = make_unique<UploadBuffer<GpuMaterialInfo>>(MATERIAL_COUNT, "Material upload buffer");
         MaterialInfoBuffer = make_unique<StructuredBuffer>();
-        MaterialInfoBuffer->Create("MaterialInfo", sizeof GpuMaterialInfo, MATERIAL_COUNT);
+        MaterialInfoBuffer->Create("MaterialInfo", sizeof(GpuMaterialInfo), MATERIAL_COUNT);
         MaterialInfoBuffer->AddShaderResourceView();
 
         VClipUploadBuffer = make_unique<UploadBuffer<GpuVClip>>(VCLIP_COUNT, "vclip buffer");
         VClipBuffer = make_unique<StructuredBuffer>();
-        VClipBuffer->Create("VClips", sizeof GpuVClip, VCLIP_COUNT);
+        VClipBuffer->Create("VClips", sizeof(GpuVClip), VCLIP_COUNT);
         VClipBuffer->AddShaderResourceView();
 
         for (auto& buffer : FrameUploadBuffers)
