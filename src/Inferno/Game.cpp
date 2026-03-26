@@ -91,6 +91,10 @@ namespace Inferno::Game {
             auto& network = Network::NetworkManager::Instance();
             network.clearPlayerObjectIds();
 
+            const auto netId = network.getPlayerId();
+
+            SPDLOG_INFO("Initializing multiplayer player objects for local player {}", netId);
+
             for (int id = 0; id < Level.Objects.size(); id++) {
                 auto& obj = Level.Objects[id];
                 if (!obj.IsPlayer())
@@ -100,7 +104,10 @@ namespace Inferno::Game {
                     continue;
 
                 const auto playerId = static_cast<uint8>(obj.ID);
-                if (id != (int)Player.Reference.Id) {
+                if (playerId == netId) {
+                    Player.Reference.Id = (ObjID)id;
+                    Player.Reference.Signature = obj.Signature;
+                } else {
                     InitObject(obj, ObjectType::Player, obj.ID, true);
                     obj.ID = playerId;
                     obj.Control.Type = ControlType::Remote;
@@ -117,6 +124,32 @@ namespace Inferno::Game {
 
                 const bool isAvailable = network.hasPlayer(playerId);
                 obj.Render.Type = isAvailable ? RenderType::Model : RenderType::None;
+                SPDLOG_INFO("Multiplayer slot {} mapped to object {} (segment={}, available={}, render={}, model={})",
+                            playerId,
+                            id,
+                            (int)obj.Segment,
+                            isAvailable,
+                            (int)obj.Render.Type,
+                            (int)obj.Render.Model.ID);
+            }
+        }
+
+        void DumpMP() {
+            SPDLOG_INFO("DumpMP local player %d", (int)Player.Reference.Id);
+            auto& network = Network::NetworkManager::Instance();
+            for (auto& [playerId, id] : network.getPlayerObjectIds()) {
+                auto* objp = Level.TryGetObject(id);
+                if (!objp)
+                    continue;
+                auto& obj = *objp;
+                const bool isAvailable = network.hasPlayer(playerId);
+                SPDLOG_INFO("Multiplayer slot {} mapped to object {} (segment={}, available={}, render={}, model={})",
+                            playerId,
+                            id,
+                            (int)obj.Segment,
+                            isAvailable,
+                            (int)obj.Render.Type,
+                            (int)obj.Render.Model.ID);
             }
         }
 
@@ -165,12 +198,16 @@ namespace Inferno::Game {
                 const auto position = Vector3::Lerp(PositionFromMessage(startState), PositionFromMessage(endState), t);
                 const auto rotation = InterpolateRotation(RotationFromMessage(startState), RotationFromMessage(endState), t);
                 auto objectId = network.getPlayerObjectId(playerId);
-                if (!objectId)
+                if (!objectId) {
+                    SPDLOG_WARN("No mapped object for remote player {} while applying state", playerId);
                     continue;
+                }
 
                 auto* object = Level.TryGetObject(*objectId);
-                if (!object)
+                if (!object) {
+                    SPDLOG_WARN("Mapped object {} for remote player {} was invalid", (int)*objectId, playerId);
                     continue;
+                }
 
                 object->PrevPosition = object->Position;
                 object->PrevRotation = object->Rotation;
@@ -180,6 +217,16 @@ namespace Inferno::Game {
                 object->Physics.Velocity = Vector3(endState.velocity_x, endState.velocity_y, endState.velocity_z);
                 object->Render.Type = remoteState.isDead ? RenderType::None : RenderType::Model;
                 UpdateObjectSegment(Level, *object);
+
+                if (!remoteState.hasPreviousSnapshot) {
+                    SPDLOG_INFO("Applied first remote snapshot for player {} to object {} (segment={}, render={}, model={}, dead={})",
+                                playerId,
+                                (int)*objectId,
+                                (int)object->Segment,
+                                (int)object->Render.Type,
+                                (int)object->Render.Model.ID,
+                                remoteState.isDead);
+                }
             }
 
             for (const auto& [playerId, objectId] : playerObjectIds) {
@@ -895,7 +942,7 @@ namespace Inferno::Game {
                     if (Player.IsDead)
                         UpdateDeathSequence(dt);
                     else if (!Level.Objects.empty())
-                        MoveCameraToObject(Game::MainCamera, Level.Objects[0], LerpAmount);
+                        MoveCameraToObject(Game::MainCamera, Game::GetPlayerObject(), LerpAmount);
                 }
 
                 break;
@@ -1266,7 +1313,6 @@ namespace Inferno::Game {
         if (!CheckForPlayerStart(Level))
             return false;
 
-        auto& player = GetPlayerObject();
 
         if (Game::PlayingFromEditor) {
             if (Input::ControlDown && Level.SegmentExists(Editor::Selection.Segment)) {
@@ -1305,7 +1351,17 @@ namespace Inferno::Game {
         ResetEffects();
         //Render::Materials->UnloadNamedTextures(); // was this necessary to fix HUD icons?
         Render::Materials->LoadGameTextures();
+        std::vector<int8> objectIds;
+        objectIds.reserve(Level.Objects.size());
+        for (const auto& obj : Level.Objects)
+            objectIds.push_back(obj.ID);
+
         InitObjects(Level);
+        for (int i = 0; i < Level.Objects.size() && i < objectIds.size(); i++) {
+            if (Level.Objects[i].IsPlayer() || Level.Objects[i].IsCoop())
+                Level.Objects[i].ID = objectIds[i];
+        }
+
         InitializeMatcens(Level);
         LoadHUDTextures();
         LoadGameTextures();
@@ -1316,10 +1372,17 @@ namespace Inferno::Game {
 
         Automap = AutomapInfo(Level);
 
-        // Reset player state
-        InitObject(player, ObjectType::Player);
+        Player.Reference = { ObjID(0), Level.Objects[0].Signature };
 
-        Player.Reference = { ObjID(0), player.Signature };
+        const bool isMultiplayer = Network::NetworkManager::Instance().isConnected();
+        if (isMultiplayer)
+            InitializeMultiplayerPlayerObjects();
+
+        auto& player = GetPlayerObject();
+
+        // Reset player state
+        //InitObject(player, ObjectType::Player);
+
         Player.SpawnPosition = player.Position;
         Player.SpawnRotation = player.Rotation;
         Player.SpawnSegment = player.Segment;
@@ -1339,7 +1402,6 @@ namespace Inferno::Game {
         Level.Rooms = CreateRooms(Level, player.Segment);
         Level.HasBoss = false;
         Graphics::NotifyLevelChanged(); // regenerate level meshes
-        const bool isMultiplayer = Network::NetworkManager::Instance().isConnected();
 
         // init objects
         for (int id = 0; id < Level.Objects.size(); id++) {
@@ -1396,10 +1458,8 @@ namespace Inferno::Game {
             }
 
             FixObjectPosition(obj);
+            
         }
-
-        if (isMultiplayer)
-            InitializeMultiplayerPlayerObjects();
 
         MarkAmbientSegments(SoundFlag::AmbientLava, TextureFlag::Volatile);
         MarkAmbientSegments(SoundFlag::AmbientWater, TextureFlag::Water);
@@ -1412,6 +1472,7 @@ namespace Inferno::Game {
         ResetGameTime = true; // Reset game time so objects don't move before fully loaded
 
         PlayerLevelStart = Player;
+        DumpMP();
         return true;
     }
 

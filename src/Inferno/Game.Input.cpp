@@ -320,7 +320,10 @@ namespace Inferno {
         if (dt <= 0 || Game::Level.Objects.empty())
             return;
 
-        auto& player = Game::Level.Objects[0];
+        auto playerPtr = Game::Level.TryGetObject(Game::Player.Reference);
+        if (!playerPtr)
+            return;
+        auto& player = *playerPtr;
         auto& physics = player.Physics;
         // Reset previous inputs
         physics.Thrust = Vector3::Zero;

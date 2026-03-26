@@ -138,7 +138,7 @@ namespace Inferno::Network {
         std::mutex m_queueMutex;
         float m_updateTimer = 0.0f;
         bool m_shouldSendPlayerState = false;
-        const float m_updateRate = 1.0f / 30.0f; // 30 updates per second
+        const float m_updateRate = 1.0f / 2.0f; // 30 updates per second
         uint16_t m_port = LISTEN_PORT;
         uint8_t m_nextPlayerId = 1;
         std::unordered_map<uint8_t, SLNet::SystemAddress> m_playerAddresses;

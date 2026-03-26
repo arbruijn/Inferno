@@ -1066,7 +1066,7 @@ namespace Inferno {
                     angle = Vector3::Zero;
 
                 obj.Flags = (ObjectFlag)0;
-                obj.ID = 0; // can only have one ID 0 player, fix it later
+                //obj.ID = 0; // can only have one ID 0 player, fix it later
                 break;
             }
 

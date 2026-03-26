@@ -360,7 +360,8 @@ namespace Inferno::Game {
             if (weapon.IsExplosive() || !weapon.Extended.DirectDamage)
                 damage = 0;
 
-            Game::Player.ApplyDamage(damage * weapon.PlayerDamageScale, true);
+            if (Game::GetObjectRef(target) == Game::Player.Reference)
+                Game::Player.ApplyDamage(damage * weapon.PlayerDamageScale, true);
 
             if (auto parent = Game::GetObject(src.Parent)) {
                 if (parent->IsRobot()) {

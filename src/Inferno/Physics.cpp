@@ -1,4 +1,4 @@
-#include "pch.h"
+    #include "pch.h"
 #define NOMINMAX
 #include "Physics.h"
 #include "Game.AI.h"
@@ -340,8 +340,8 @@ namespace Inferno {
                     break;
                 }
                 case ObjectType::Player: {
-                    if (target.Render.Type == RenderType::None) return CollisionType::None; // No hit for hidden players
-                    if (src.Parent.Id == ObjID(0)) return CollisionType::None; // Don't hit the player with their own shots
+                    auto targetId = Game::GetObjectRef(target);
+                    if (src.Parent == targetId) return CollisionType::None; // Don't hit the player with their own shots
                     if (WeaponIsMine((WeaponID)src.ID) && src.Control.Weapon.AliveTime < Game::MINE_ARM_TIME)
                         return CollisionType::None; // Mines can't hit the player until they arm
                     break;
@@ -551,7 +551,8 @@ namespace Inferno {
 
                         // Quarter damage explosions on trainee
                         if (Game::Difficulty == DifficultyLevel::Trainee) damage /= 4;
-                        Game::Player.ApplyDamage(damage, false);
+                        if (objId == Game::Player.Reference.Id)
+                            Game::Player.ApplyDamage(damage, false);
                         break;
                     }
 
@@ -1396,7 +1397,7 @@ namespace Inferno {
         constexpr int STEPS = 1;
 #else
         constexpr int STEPS = 2;
-#endif;
+#endif
 
         dt /= STEPS;
 
@@ -1406,7 +1407,7 @@ namespace Inferno {
         auto& obj = *pobj;
 
         if (!obj.IsAlive() && obj.Type != ObjectType::Reactor) return;
-        if (obj.Type == ObjectType::Player && obj.ID > 0) return; // singleplayer only
+        if (obj.Type == ObjectType::Player && obj.Render.Type != RenderType::None) return; // local player only
 
         // for powerups with models
         if (obj.Movement == MovementType::Spinning) {

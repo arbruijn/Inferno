@@ -201,10 +201,11 @@ namespace Inferno::Render {
             _objects.clear();
 
         auto state = Game::GetState();
+        auto playerObjId = Game::Player.Reference.Id;
 
         // queue objects in segment
         for (auto oid : seg.Objects) {
-            if (oid == ObjID(0)) {
+            if (oid == playerObjId) {
                 if ((state == GameState::Game || state == GameState::PauseMenu) && !Game::Player.IsDead)
                     continue;
 

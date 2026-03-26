@@ -329,7 +329,7 @@ namespace Inferno::Network {
                 broadcastMessage(MessageID::PlayerState, bytes);
             }
 
-            SPDLOG_DEBUG("NetworkManager: Received state for player {}", state.player_id);
+            SPDLOG_INFO("NetworkManager: Received state for player {}", state.player_id);
         } else {
             SPDLOG_WARN("NetworkManager: Failed to deserialize PlayerState");
         }
@@ -436,6 +436,7 @@ namespace Inferno::Network {
     }
 
     void NetworkManager::broadcastPlayerState(const PlayerStateMessage& state) {
+        SPDLOG_INFO("NetworkManager: Sending state for player {}", state.player_id);
         auto bytes = Serialize(state);
         broadcastMessage(MessageID::PlayerState, bytes);
     }
