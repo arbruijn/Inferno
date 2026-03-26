@@ -15,7 +15,6 @@
 
 namespace Inferno::UI {
     using ClickHandler = std::function<void(const Vector2*)>;
-    using MissionSelectContinuation = std::function<void(MissionInfo&, int, DifficultyLevel)>;
 
     namespace {
         bool CursorCaptured = false;
@@ -345,11 +344,35 @@ namespace Inferno::UI {
         }
     };
 
-    class MainMenu : public ScreenBase {
-        DifficultyLevel _difficulty{};
-        int _level = 1;
-        MissionInfo _mission;
+    void ShowStartGameFlow(MissionSelectContinuation continuation) {
+        static DifficultyLevel difficulty = Game::Difficulty;
+        static int level = 1;
+        static MissionInfo mission;
 
+        if (Game::DemoMode) {
+            mission = Game::CreateDescent1Mission(true);
+            ShowLevelSelect(mission, level, difficulty, std::move(continuation));
+            return;
+        }
+
+        auto missions = GetDescent1MissionList();
+
+        if (missions.size() == 1) {
+            mission = missions[0];
+            if (mission.Levels.size() > 1) {
+                ShowLevelSelect(mission, level, difficulty, std::move(continuation));
+            }
+            else {
+                level = 1;
+                ShowDifficultySelect(mission, level, difficulty, std::move(continuation));
+            }
+        }
+        else {
+            ShowScreen(make_unique<PlayD1Dialog>(missions, std::move(continuation)));
+        }
+    }
+
+    class MainMenu : public ScreenBase {
     public:
         MainMenu() {
             CloseOnConfirm = false;
@@ -360,7 +383,7 @@ namespace Inferno::UI {
             panel->HorizontalAlignment = AlignH::CenterRight;
             panel->VerticalAlignment = AlignV::Top;
 
-            panel->AddChild<Button>("Play Descent", [this] {
+            panel->AddChild<Button>("Play Descent", [] {
                 ShowStartGameFlow([](MissionInfo& mission, int level, DifficultyLevel difficulty) {
                     Game::StartMission();
                     Game::Difficulty = difficulty;
@@ -407,30 +430,6 @@ namespace Inferno::UI {
 
                 ShowScreen(std::move(confirmDialog));
             });
-        }
-
-        void ShowStartGameFlow(MissionSelectContinuation continuation) {
-            if (Game::DemoMode) {
-                _mission = Game::CreateDescent1Mission(true);
-                ShowLevelSelect(_mission, _level, _difficulty, std::move(continuation)); // Demo has 7 levels
-                return;
-            }
-
-            auto missions = GetDescent1MissionList();
-
-            if (missions.size() == 1) {
-                _mission = missions[0];
-                if (_mission.Levels.size() > 1) {
-                    ShowLevelSelect(_mission, _level, _difficulty, std::move(continuation));
-                }
-                else {
-                    _level = 1;
-                    ShowDifficultySelect(_mission, _level, _difficulty, std::move(continuation)); // Use the first level instead of showing selection screen
-                }
-            }
-            else {
-                ShowScreen(make_unique<PlayD1Dialog>(missions, std::move(continuation)));
-            }
         }
 
         void OnDraw() override {

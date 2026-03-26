@@ -1,5 +1,8 @@
 #include "pch.h"
 #include "NetworkManager.h"
+#include "Game.h"
+#include "Game.IO.h"
+#include "Resources.h"
 #include <algorithm>
 #include <set>
 #include <slikenet/types.h>
@@ -15,6 +18,59 @@ namespace Inferno::Network {
             if (!bytes.empty())
                 bs.ReadBits(bytes.data(), bytes.size() * 8);
             return bytes;
+        }
+
+        GameConfigMessage ToMessage(const LobbyGameSelection& selection) {
+            return {
+                .mission_path = selection.missionPath,
+                .mission_name = selection.missionName,
+                .level_number = selection.level,
+                .difficulty = static_cast<uint8_t>(selection.difficulty),
+            };
+        }
+
+        LobbyGameSelection ToSelection(const GameConfigMessage& message) {
+            return {
+                .missionPath = message.mission_path,
+                .missionName = message.mission_name,
+                .level = message.level_number,
+                .difficulty = static_cast<DifficultyLevel>(std::clamp<int>(message.difficulty, 0, static_cast<int>(DifficultyLevel::Count) - 1)),
+            };
+        }
+
+        List<MissionInfo> GetMultiplayerMissionList() {
+            List<MissionInfo> missions = Resources::ReadMissionDirectory("d1/missions");
+
+            if (Resources::FoundDescent1())
+                missions.insert(missions.begin(), Game::CreateDescent1Mission(false));
+            else if (Resources::FoundDescent1Demo())
+                missions.insert(missions.begin(), Game::CreateDescent1Mission(true));
+
+            return missions;
+        }
+
+        std::optional<MissionInfo> ResolveMission(const LobbyGameSelection& selection) {
+            auto missions = GetMultiplayerMissionList();
+            const std::filesystem::path missionPath(selection.missionPath);
+
+            for (const auto& mission : missions) {
+                if ((!selection.missionPath.empty() && mission.Path == missionPath) || mission.Name == selection.missionName)
+                    return mission;
+            }
+
+            return std::nullopt;
+        }
+
+        void StartSelectedMission(const LobbyGameSelection& selection) {
+            auto mission = ResolveMission(selection);
+            if (!mission) {
+                SPDLOG_WARN("NetworkManager: Could not resolve mission '{}' ({})", selection.missionName, selection.missionPath);
+                return;
+            }
+
+            Game::StartMission();
+            Game::Difficulty = selection.difficulty;
+            Game::LoadLevelFromMission(*mission, selection.level, false);
         }
     }
 
@@ -129,6 +185,7 @@ namespace Inferno::Network {
         m_playerAddresses.clear();
         m_remotePlayers.clear();
         m_lobbyPlayers.clear();
+        m_lobbyGameSelection.reset();
     }
 
     void NetworkManager::update(float dt) {
@@ -168,6 +225,7 @@ namespace Inferno::Network {
                         const auto playerId = assignPlayerId(packet->systemAddress);
                         sendMessage(packet->systemAddress, MessageID::PlayerJoin, { playerId });
                         sendExistingLobbyPlayers(packet->systemAddress);
+                        sendGameSelection(packet->systemAddress);
                     }
                     break;
                 case ID_CONNECTION_REQUEST_ACCEPTED:
@@ -207,6 +265,9 @@ namespace Inferno::Network {
                                 break;
                             case MessageID::PlayerInfo:
                                 handlePlayerInfo(packet);
+                                break;
+                            case MessageID::GameConfig:
+                                handleGameConfig(packet);
                                 break;
                             default:
                                 SPDLOG_WARN("NetworkManager: Unknown custom message ID {}", packet->data[0]);
@@ -296,8 +357,18 @@ namespace Inferno::Network {
     }
 
     void NetworkManager::handleGameStart(SLNet::Packet* packet) {
-        SPDLOG_INFO("NetworkManager: GameStart received");
-        // TODO: start game
+        auto bytes = ReadPayload(packet);
+        GameConfigMessage message;
+        if (!Deserialize(bytes, message)) {
+            SPDLOG_WARN("NetworkManager: Failed to deserialize GameStart");
+            return;
+        }
+
+        m_lobbyGameSelection = ToSelection(message);
+        SPDLOG_INFO("NetworkManager: GameStart received for mission '{}' level {}", message.mission_name, message.level_number);
+
+        if (!m_isHost)
+            StartSelectedMission(*m_lobbyGameSelection);
     }
 
     void NetworkManager::handlePlayerInfo(SLNet::Packet* packet) {
@@ -315,6 +386,21 @@ namespace Inferno::Network {
 
         if (m_isHost)
             broadcastMessage(MessageID::PlayerInfo, bytes);
+    }
+
+    void NetworkManager::handleGameConfig(SLNet::Packet* packet) {
+        auto bytes = ReadPayload(packet);
+        GameConfigMessage message;
+        if (!Deserialize(bytes, message)) {
+            SPDLOG_WARN("NetworkManager: Failed to deserialize GameConfig");
+            return;
+        }
+
+        m_lobbyGameSelection = ToSelection(message);
+        SPDLOG_INFO("NetworkManager: Game config updated to mission '{}' level {}", message.mission_name, message.level_number);
+
+        if (m_isHost)
+            broadcastMessage(MessageID::GameConfig, bytes);
     }
 
     void NetworkManager::broadcastMessage(MessageID id, const std::vector<uint8_t>& data) {
@@ -431,6 +517,36 @@ namespace Inferno::Network {
             .player_id = m_playerId,
             .name = m_localPlayerName,
         }));
+    }
+
+    void NetworkManager::sendGameSelection(const SLNet::SystemAddress& target) {
+        if (!m_lobbyGameSelection)
+            return;
+
+        sendMessage(target, MessageID::GameConfig, Serialize(ToMessage(*m_lobbyGameSelection)));
+    }
+
+    void NetworkManager::setHostedGameSelection(const MissionInfo& mission, int level, DifficultyLevel difficulty) {
+        m_lobbyGameSelection = LobbyGameSelection{
+            .missionPath = mission.Path.string(),
+            .missionName = mission.Name,
+            .level = level,
+            .difficulty = difficulty,
+        };
+
+        if (isConnected() && m_isHost)
+            broadcastMessage(MessageID::GameConfig, Serialize(ToMessage(*m_lobbyGameSelection)));
+    }
+
+    void NetworkManager::startHostedGame() {
+        if (!m_isHost || !m_lobbyGameSelection)
+            return;
+
+        auto payload = Serialize(ToMessage(*m_lobbyGameSelection));
+        for (const auto& [_, address] : m_playerAddresses)
+            sendMessage(address, MessageID::GameStart, payload);
+
+        StartSelectedMission(*m_lobbyGameSelection);
     }
 
     void NetworkManager::updateRemotePlayers(float dt) {

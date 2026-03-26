@@ -13,6 +13,7 @@ namespace Inferno::Network {
         PlayerDeath = 103,
         GameStart = 104,
         PlayerInfo = 105,
+        GameConfig = 106,
     };
 
     // Player state update message
@@ -35,6 +36,13 @@ namespace Inferno::Network {
     struct PlayerInfoMessage {
         uint8_t player_id;
         std::string name;
+    };
+
+    struct GameConfigMessage {
+        std::string mission_path;
+        std::string mission_name;
+        int level_number = 1;
+        uint8_t difficulty = 0;
     };
 
     // Serialization functions using alpaca

@@ -12,6 +12,9 @@ namespace Inferno::UI {
 
     class LobbyDialog : public DialogBase {
         Label* _statusLabel = nullptr;
+        Label* _gameLabel = nullptr;
+        Label* _detailsLabel = nullptr;
+        Button* _startButton = nullptr;
 
         static std::vector<Network::LobbyPlayer> GetSortedPlayers() {
             std::vector<Network::LobbyPlayer> players;
@@ -27,7 +30,7 @@ namespace Inferno::UI {
 
     public:
         LobbyDialog() : DialogBase("lobby") {
-            Size = Vector2(420, 260);
+            Size = Vector2(420, 320);
             CloseOnConfirm = false;
             ActionSound = "";
 
@@ -35,12 +38,28 @@ namespace Inferno::UI {
             _statusLabel->Position = Vector2(DIALOG_PADDING, 48);
             _statusLabel->Color = GOLD_TEXT;
 
+            _gameLabel = AddChild<Label>("", FontSize::MediumBlue);
+            _gameLabel->Position = Vector2(DIALOG_PADDING, 74);
+            _gameLabel->Color = DIALOG_TITLE_COLOR;
+
+            _detailsLabel = AddChild<Label>("", FontSize::Small);
+            _detailsLabel->Position = Vector2(DIALOG_PADDING, 100);
+            _detailsLabel->Color = HELP_TEXT_COLOR;
+
             auto backButton = AddChild<Button>("Back");
             backButton->Position = Vector2(DIALOG_PADDING, -DIALOG_PADDING);
             backButton->VerticalAlignment = AlignV::Bottom;
             backButton->ClickAction = [this] {
                 Network::NetworkManager::Instance().disconnect();
                 State = CloseState::Cancel;
+            };
+
+            _startButton = AddChild<Button>("Start Game");
+            _startButton->Position = Vector2(0, -DIALOG_PADDING);
+            _startButton->HorizontalAlignment = AlignH::Center;
+            _startButton->VerticalAlignment = AlignV::Bottom;
+            _startButton->ClickAction = [] {
+                Network::NetworkManager::Instance().startHostedGame();
             };
 
             auto closeButton = AddChild<Button>("Close");
@@ -56,6 +75,9 @@ namespace Inferno::UI {
             auto& network = Network::NetworkManager::Instance();
             if (!network.isConnected()) {
                 _statusLabel->SetText("status: disconnected");
+                _gameLabel->SetText("game: unavailable");
+                _detailsLabel->SetText("");
+                _startButton->Visible = false;
                 return;
             }
 
@@ -65,6 +87,19 @@ namespace Inferno::UI {
                 _statusLabel->SetText(fmt::format("connecting on port {}", network.getPort()));
             else
                 _statusLabel->SetText(fmt::format("connected as player {}", network.getPlayerId()));
+
+            const auto& selection = network.getLobbyGameSelection();
+            if (selection) {
+                _gameLabel->SetText(fmt::format("game: {}", selection->missionName));
+                _detailsLabel->SetText(fmt::format("level {}  difficulty {}", selection->level, DifficultyToString(selection->difficulty)));
+            }
+            else {
+                _gameLabel->SetText("game: waiting for host selection");
+                _detailsLabel->SetText("");
+            }
+
+            _startButton->Visible = network.isHost();
+            _startButton->Enabled = network.isHost() && selection.has_value();
         }
 
         void OnDraw() override {
@@ -72,7 +107,7 @@ namespace Inferno::UI {
 
             const auto players = GetSortedPlayers();
             const auto scale = GetScale();
-            float y = ScreenPosition.y + 84 * scale;
+            float y = ScreenPosition.y + 132 * scale;
 
             if (players.empty()) {
                 Render::DrawTextInfo dti;
@@ -208,12 +243,17 @@ namespace Inferno::UI {
             hostButton->VerticalAlignment = AlignV::Bottom;
             hostButton->ClickAction = [this] {
                 ApplyPlayerName(true);
-                auto& network = Network::NetworkManager::Instance();
-                if (!network.isConnected())
-                    network.startHost();
+                ShowStartGameFlow([this](MissionInfo& mission, int level, DifficultyLevel difficulty) {
+                    auto& network = Network::NetworkManager::Instance();
+                    if (network.isConnected())
+                        network.disconnect();
 
-                RefreshStatus();
-                OpenLobbyIfConnected();
+                    if (network.startHost())
+                        network.setHostedGameSelection(mission, level, difficulty);
+
+                    RefreshStatus();
+                    OpenLobbyIfConnected();
+                });
             };
 
             auto joinButton = AddChild<Button>("Join Game");

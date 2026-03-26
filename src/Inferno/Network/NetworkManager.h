@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Messages.h"
+#include "Difficulty.h"
+#include "Mission.h"
 #include <optional>
 #include <unordered_map>
 #include <slikenet/peer.h>
@@ -28,6 +30,13 @@ namespace Inferno::Network {
     struct LobbyPlayer {
         uint8_t playerId = 0xFF;
         std::string name;
+    };
+
+    struct LobbyGameSelection {
+        std::string missionPath;
+        std::string missionName;
+        int level = 1;
+        DifficultyLevel difficulty = DifficultyLevel::Hotshot;
     };
 
     class NetworkManager {
@@ -79,6 +88,10 @@ namespace Inferno::Network {
 
         const std::unordered_map<uint8_t, RemotePlayerState>& getRemotePlayers() const { return m_remotePlayers; }
         const std::unordered_map<uint8_t, LobbyPlayer>& getLobbyPlayers() const { return m_lobbyPlayers; }
+        const std::optional<LobbyGameSelection>& getLobbyGameSelection() const { return m_lobbyGameSelection; }
+
+        void setHostedGameSelection(const MissionInfo& mission, int level, DifficultyLevel difficulty);
+        void startHostedGame();
 
     private:
         NetworkManager();
@@ -94,12 +107,14 @@ namespace Inferno::Network {
         void handlePlayerDeath(SLNet::Packet* packet);
         void handleGameStart(SLNet::Packet* packet);
         void handlePlayerInfo(SLNet::Packet* packet);
+        void handleGameConfig(SLNet::Packet* packet);
         uint8_t assignPlayerId(const SLNet::SystemAddress& address);
         std::optional<uint8_t> findPlayerId(const SLNet::SystemAddress& address) const;
         void removeRemotePlayer(uint8_t playerId);
         void setLobbyPlayer(uint8_t playerId, std::string name);
         void sendExistingLobbyPlayers(const SLNet::SystemAddress& target);
         void sendLocalPlayerInfo();
+        void sendGameSelection(const SLNet::SystemAddress& target);
         void updateRemotePlayers(float dt);
 
         // Send a raw message to all connected peers
@@ -122,5 +137,6 @@ namespace Inferno::Network {
         std::unordered_map<uint8_t, SLNet::SystemAddress> m_playerAddresses;
         std::unordered_map<uint8_t, RemotePlayerState> m_remotePlayers;
         std::unordered_map<uint8_t, LobbyPlayer> m_lobbyPlayers;
+        std::optional<LobbyGameSelection> m_lobbyGameSelection;
     };
 }
