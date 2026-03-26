@@ -31,6 +31,18 @@ add_subdirectory(${DEPS_DIR}/spdlog)
 add_subdirectory(${DEPS_DIR}/ryml)
 add_subdirectory(${DEPS_DIR}/magic_enum)
 
+# SLikeNet requires OpenSSL
+find_package(OpenSSL REQUIRED)
+
+# Disable SLikeNet samples
+set(SLIKENET_ENABLE_SAMPLES OFF CACHE BOOL "" FORCE)
+set(SLIKENET_ENABLE_DLL OFF CACHE BOOL "" FORCE)
+
+# OpenSSL 3.x compatibility - set API level for older code
+add_compile_definitions(OPENSSL_API_COMPAT=0x10100000L)
+
+add_subdirectory(${DEPS_DIR}/SLikeNet)
+
 # lodepng has no CMakeLists.txt - compile manually from source
 set(lodepng_SOURCE_DIR ${DEPS_DIR}/lodepng CACHE PATH "lodepng source directory")
 
@@ -42,6 +54,9 @@ set(DIRECTXTK12_SOURCE_DIR ${DEPS_DIR}/DirectXTK12 CACHE PATH "DirectXTK12 sourc
 
 # D3D12 Memory Allocator is header-only (used on Linux and MinGW)
 set(d3d12memalloc_SOURCE_DIR ${DEPS_DIR}/D3D12MemoryAllocator CACHE PATH "D3D12MemoryAllocator source directory")
+
+# alpaca is header-only serialization library
+set(alpaca_SOURCE_DIR ${DEPS_DIR}/alpaca/include CACHE PATH "alpaca source directory")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Platform detection
@@ -222,7 +237,9 @@ if(MSVC)
 else()
     add_compile_options(-Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers
 	-Wno-switch -Wno-sign-compare -Wno-narrowing -Wno-ignored-qualifiers
-	-Wno-implicit-const-int-float-conversion -Wno-unused-private-field)
+	-Wno-implicit-const-int-float-conversion -Wno-unused-private-field
+	-Wno-unknown-pragmas -Wno-comment -Wno-nontrivial-memcall
+        -Wno-missing-braces)
     if(NOT MINGW)
         add_compile_options(-Wno-changes-meaning)
     endif()

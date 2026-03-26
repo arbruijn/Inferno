@@ -142,10 +142,32 @@ target_link_libraries(Inferno PRIVATE
     spdlog::spdlog
     ryml::ryml
     magic_enum::magic_enum
+    SLikeNetLibStatic
 )
+
+# SLikeNet platform dependencies
+if(WIN32)
+    target_link_libraries(Inferno PRIVATE ws2_32)
+elseif(UNIX)
+    # Linux socket library (may be needed)
+    find_library(SOCKET_LIB socket)
+    if(SOCKET_LIB)
+        target_link_libraries(Inferno PRIVATE ${SOCKET_LIB})
+    endif()
+    target_link_libraries(Inferno PRIVATE pthread)
+endif()
+
+# SLinkNet requires OpenSSL
+target_link_libraries(Inferno PRIVATE OpenSSL::Crypto OpenSSL::SSL)
+
+# SLikeNet include directory
+target_include_directories(Inferno PRIVATE ${SLikeNet_SOURCE_DIR}/Source ${SLikeNet_SOURCE_DIR}/Source/include)
 
 # lodepng
 target_include_directories(Inferno PRIVATE ${lodepng_SOURCE_DIR})
+
+# alpaca header-only
+target_include_directories(Inferno PRIVATE ${alpaca_SOURCE_DIR})
 
 if(LINUX)
     target_include_directories(Inferno SYSTEM PRIVATE

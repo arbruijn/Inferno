@@ -25,3 +25,9 @@
 [submodule "deps/DirectXTex"]
 	path = deps/DirectXTex
 	url = https://github.com/microsoft/DirectXTex.git
+[submodule "deps/SLikeNet"]
+	path = deps/SLikeNet
+	url = https://github.com/SLikeSoft/SLikeNet
+[submodule "deps/alpaca"]
+	path = deps/alpaca
+	url = https://github.com/p-ranav/alpaca

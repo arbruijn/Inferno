@@ -116,7 +116,7 @@ namespace Inferno {
             if (std::abs(v2.UV.x - v1.UV.x) > tolerance) wrapVertex(v2.UV.x > v1.UV.x ? 1 : 2);
         }
 
-        ASSERT(vertices.size() < USHORT_MAX);
+        ASSERT(vertices.size() < UINT16_MAX);
         return { vertices, indices };
     }
 }
