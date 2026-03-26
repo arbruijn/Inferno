@@ -105,6 +105,7 @@
     <ClCompile Include="Game.Terrain.cpp" />
     <ClCompile Include="Graphics\Render.Automap.cpp" />
     <ClCompile Include="Game.UI.cpp" />
+    <ClCompile Include="Game.UI.Input.cpp" />
     <ClCompile Include="Icosphere.cpp" />
     <ClCompile Include="Graphics\Render.MainMenu.cpp" />
     <ClCompile Include="Game.Automap.cpp" />
@@ -272,6 +273,7 @@
     <ClInclude Include="Icosphere.h" />
     <ClInclude Include="Graphics\Render.MainMenu.h" />
     <ClInclude Include="Game.UI.h" />
+    <ClInclude Include="Game.UI.Input.h" />
     <ClInclude Include="Game.Automap.h" />
     <ClInclude Include="Graphics\Render.Briefing.h" />
     <ClInclude Include="Game.UI.Controls.h" />

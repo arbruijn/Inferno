@@ -226,6 +226,7 @@
     <ClCompile Include="Game.Save.cpp" />
     <ClCompile Include="Game.Terrain.cpp" />
     <ClCompile Include="Game.UI.cpp" />
+    <ClCompile Include="Game.UI.Input.cpp" />
     <ClCompile Include="Game.UI.ScoreScreen.cpp" />
     <ClCompile Include="Graphics.Debug.cpp" />
     <None Include="d1\game.yml" />
@@ -385,6 +386,7 @@
     <ClInclude Include="Game.UI.Bindings.h" />
     <ClInclude Include="Game.UI.Controls.h" />
     <ClInclude Include="Game.UI.h" />
+    <ClInclude Include="Game.UI.Input.h" />
     <ClInclude Include="Game.UI.LoadDialog.h" />
     <ClInclude Include="Game.UI.Options.h" />
     <ClInclude Include="Game.UI.ScoreScreen.h" />
