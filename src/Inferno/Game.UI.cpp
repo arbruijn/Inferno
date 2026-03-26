@@ -15,6 +15,7 @@
 
 namespace Inferno::UI {
     using ClickHandler = std::function<void(const Vector2*)>;
+    using MissionSelectContinuation = std::function<void(MissionInfo&, int, DifficultyLevel)>;
 
     namespace {
         bool CursorCaptured = false;
@@ -266,35 +267,34 @@ namespace Inferno::UI {
         return missions;
     }
 
-    void ShowDifficultySelect(MissionInfo& mission, int& level, DifficultyLevel& difficulty) {
+    void ShowDifficultySelect(MissionInfo& mission, int& level, DifficultyLevel& difficulty, MissionSelectContinuation continuation) {
         auto screen = ShowScreen(make_unique<DifficultyDialog>(difficulty));
 
-        screen->CloseCallback = [&mission, &difficulty, level](CloseState state) {
+        screen->CloseCallback = [&mission, &difficulty, &level, continuation = std::move(continuation)](CloseState state) {
             if (state == CloseState::Accept) {
-                Game::StartMission();
-                Game::Difficulty = difficulty;
-                Game::LoadLevelFromMission(mission, level);
+                continuation(mission, level, difficulty);
             }
         };
     }
 
-    void ShowLevelSelect(MissionInfo& mission, int& level, DifficultyLevel& difficulty) {
+    void ShowLevelSelect(MissionInfo& mission, int& level, DifficultyLevel& difficulty, MissionSelectContinuation continuation) {
         auto screen = ShowScreen(make_unique<LevelSelectDialog>((int)mission.Levels.size(), level));
 
-        screen->CloseCallback = [&mission, &difficulty, &level](CloseState state) {
+        screen->CloseCallback = [&mission, &difficulty, &level, continuation = std::move(continuation)](CloseState state) {
             if (state == CloseState::Accept)
-                ShowDifficultySelect(mission, level, difficulty);
+                ShowDifficultySelect(mission, level, difficulty, continuation);
         };
     }
 
     class PlayD1Dialog : public DialogBase {
         List<MissionInfo> _missions;
+        MissionSelectContinuation _continuation;
         DifficultyLevel _difficulty{};
         int _level = 1;
         MissionInfo* _mission = nullptr;
 
     public:
-        PlayD1Dialog(const List<MissionInfo>& missions) : _missions(missions) {
+        PlayD1Dialog(const List<MissionInfo>& missions, MissionSelectContinuation continuation) : _missions(missions), _continuation(std::move(continuation)) {
             Size = Vector2(500, 460);
             CloseOnConfirm = false;
             _difficulty = Game::Difficulty;
@@ -329,10 +329,10 @@ namespace Inferno::UI {
                     _level = 1;
 
                     if (mission->Levels.size() > 1) {
-                        ShowLevelSelect(*mission, _level, _difficulty);
+                        ShowLevelSelect(*mission, _level, _difficulty, _continuation);
                     }
                     else {
-                        ShowDifficultySelect(*mission, _level, _difficulty); // Use the first level instead of showing selection screen
+                        ShowDifficultySelect(*mission, _level, _difficulty, _continuation); // Use the first level instead of showing selection screen
                     }
 
                     Sound::Play2D(SoundResource{ ActionSound });
@@ -361,27 +361,11 @@ namespace Inferno::UI {
             panel->VerticalAlignment = AlignV::Top;
 
             panel->AddChild<Button>("Play Descent", [this] {
-                if (Game::DemoMode) {
-                    _mission = Game::CreateDescent1Mission(true);
-                    ShowLevelSelect(_mission, _level, _difficulty); // Demo has 7 levels
-                }
-                else {
-                    auto missions = GetDescent1MissionList();
-
-                    if (missions.size() == 1) {
-                        _mission = missions[0];
-                        if (_mission.Levels.size() > 1) {
-                            ShowLevelSelect(_mission, _level, _difficulty);
-                        }
-                        else {
-                            _level = 1;
-                            ShowDifficultySelect(_mission, _level, _difficulty); // Use the first level instead of showing selection screen
-                        }
-                    }
-                    else {
-                        ShowScreen(make_unique<PlayD1Dialog>(missions));
-                    }
-                }
+                ShowStartGameFlow([](MissionInfo& mission, int level, DifficultyLevel difficulty) {
+                    Game::StartMission();
+                    Game::Difficulty = difficulty;
+                    Game::LoadLevelFromMission(mission, level);
+                });
             });
 
             //panel->AddChild<Button>("Play Descent 2");
@@ -423,6 +407,30 @@ namespace Inferno::UI {
 
                 ShowScreen(std::move(confirmDialog));
             });
+        }
+
+        void ShowStartGameFlow(MissionSelectContinuation continuation) {
+            if (Game::DemoMode) {
+                _mission = Game::CreateDescent1Mission(true);
+                ShowLevelSelect(_mission, _level, _difficulty, std::move(continuation)); // Demo has 7 levels
+                return;
+            }
+
+            auto missions = GetDescent1MissionList();
+
+            if (missions.size() == 1) {
+                _mission = missions[0];
+                if (_mission.Levels.size() > 1) {
+                    ShowLevelSelect(_mission, _level, _difficulty, std::move(continuation));
+                }
+                else {
+                    _level = 1;
+                    ShowDifficultySelect(_mission, _level, _difficulty, std::move(continuation)); // Use the first level instead of showing selection screen
+                }
+            }
+            else {
+                ShowScreen(make_unique<PlayD1Dialog>(missions, std::move(continuation)));
+            }
         }
 
         void OnDraw() override {
