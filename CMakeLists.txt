@@ -204,6 +204,13 @@ endif()
     target_compile_definitions(DirectXTK12Lib PRIVATE _WIN32)
     target_compile_options(DirectXTK12Lib PRIVATE -w)
 
+    # Create DirectXTK12 subdirectory symlink for <DirectXTK12/Header.h> includes
+    if(NOT EXISTS ${CMAKE_BINARY_DIR}/Inc/DirectXTK12)
+	file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/Inc/DirectXTK12)
+        file(COPY ${DIRECTXTK12_SOURCE_DIR}/Inc/. DESTINATION ${CMAKE_BINARY_DIR}/Inc/DirectXTK12)
+    endif()
+    include_directories(${CMAKE_BINARY_DIR}/Inc)
+
     # D3D12MemoryAllocator source
     add_library(D3D12MALib STATIC ${d3d12memalloc_SOURCE_DIR}/src/D3D12MemAlloc.cpp)
     target_include_directories(D3D12MALib SYSTEM PUBLIC
