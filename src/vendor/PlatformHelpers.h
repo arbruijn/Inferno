@@ -10,10 +10,14 @@
 
 #pragma once
 
+#ifdef _MSC_VER
 #pragma warning(disable : 4324)
+#endif
 
 #include <exception>
 #include <memory>
+#include <cstdio>
+#include <cstdarg>
 
 #ifndef MAKEFOURCC
 #define MAKEFOURCC(ch0, ch1, ch2, ch3) \
@@ -28,9 +32,9 @@ class com_exception : public std::exception {
 public:
     com_exception(HRESULT hr) noexcept : result(hr) {}
 
-    const char* what() const override {
+    const char* what() const noexcept override {
         static char s_str[64] = {};
-        sprintf_s(s_str, "Failure with HRESULT of %08X", static_cast<unsigned int>(result));
+        snprintf(s_str, sizeof(s_str), "Failure with HRESULT of %08X", static_cast<unsigned int>(result));
         return s_str;
     }
 
@@ -47,32 +51,39 @@ inline void ThrowIfFailed(HRESULT hr) noexcept(false) {
 
 
 // Helper for output debug tracing
-inline void DebugTrace(_In_z_ _Printf_format_string_ const char* format, ...) noexcept {
+inline void DebugTrace(const char* format, ...) noexcept {
 #ifdef _DEBUG
     va_list args;
     va_start(args, format);
 
     char buff[1024] = {};
-    vsprintf_s(buff, format, args);
+    vsnprintf(buff, sizeof(buff), format, args);
+#ifdef _MSC_VER
     OutputDebugStringA(buff);
+#else
+    fwrite(buff, 1, strlen(buff), stderr);
+#endif
     va_end(args);
 #else
-    UNREFERENCED_PARAMETER(format);
+    (void)format;
 #endif
 }
 
 // Helper smart-pointers
+#ifdef _MSC_VER
 #if (_WIN32_WINNT >= _WIN32_WINNT_WIN10) || (defined(_XBOX_ONE) && defined(_TITLE)) || !defined(WINAPI_FAMILY) || (WINAPI_FAMILY == WINAPI_FAMILY_DESKTOP_APP)
 struct virtual_deleter { void operator()(void* p) noexcept { if (p) VirtualFree(p, 0, MEM_RELEASE); } };
 #endif
-
 struct aligned_deleter { void operator()(void* p) noexcept { _aligned_free(p); } };
-
 struct handle_closer { void operator()(HANDLE h) noexcept { if (h) CloseHandle(h); } };
-
 using ScopedHandle = std::unique_ptr<void, handle_closer>;
-
 inline HANDLE safe_handle(HANDLE h) noexcept { return (h == INVALID_HANDLE_VALUE) ? nullptr : h; }
+#else
+struct aligned_deleter { void operator()(void* p) noexcept { if (p) free(p); } };
+struct handle_closer { void operator()(void* h) noexcept { (void)h; } };
+using ScopedHandle = std::unique_ptr<void, handle_closer>;
+inline void* safe_handle(void* h) noexcept { return (h == INVALID_HANDLE_VALUE) ? nullptr : h; }
+#endif
 
 // Helper to check for power-of-2
 template<typename T>

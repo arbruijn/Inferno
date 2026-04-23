@@ -8,7 +8,7 @@
 #include "Editor/Editor.h"
 #include "Game.h"
 #include "Graphics/Compiler.h"
-#include <ryml/ryml.hpp>
+#include <ryml.hpp>
 #include "logging.h"
 #include "SystemClock.h"
 #include "WindowsDialogs.h"
@@ -160,14 +160,15 @@ void QuaternionTests() {
 
 struct RymlExceptionHandler {
     ryml::Callbacks CreateCallbacks() {
-        return { this, nullptr, nullptr, RymlExceptionHandler::ThrowException };
+        ryml::Callbacks cb;
+        cb.m_user_data = this;
+        cb.m_error_basic = RymlExceptionHandler::ThrowException;
+        return cb;
     }
 
-    static void ThrowException(const char* msg, size_t len, ryml::Location /*loc*/, void* /*this_*/) {
-        // loc gives the internal rmyl line which is not very useful
-        __debugbreak();
-        SPDLOG_WARN("RYML error: {} len: {}", msg, len);
-        throw std::runtime_error(msg);
+    static void ThrowException(ryml::csubstr msg, ryml::ErrorDataBasic const& /*errdata*/, void* /*this_*/) {
+        SPDLOG_WARN("RYML error: {}", std::string(msg.str, msg.len));
+        throw std::runtime_error(std::string(msg.str, msg.len));
     }
 };
 
@@ -214,7 +215,7 @@ void ConfigureLogging(const string& logName) {
     auto logger = std::make_shared<spdlog::logger>(
         "loggers",
         spdlog::sinks_init_list{
-            std::make_shared<spdlog::sinks::wincolor_stdout_sink_mt>(),
+            std::make_shared<spdlog::sinks::stdout_sink_mt>(),
             std::make_shared<spdlog::sinks::basic_file_sink_mt>(logPath)
         }
     );
@@ -228,7 +229,7 @@ void ConfigureLogging(const string& logName) {
 
 void ParseCommandLine() {
     int nArgs;
-    auto args = CommandLineToArgvW(GetCommandLine(), &nArgs);
+    auto args = CommandLineToArgvW(GetCommandLineW(), &nArgs);
     if (!args) return;
 
     // Skip the first arg, it is the executable path
@@ -245,9 +246,9 @@ void ParseCommandLine() {
     LocalFree((LPWSTR)args);
 }
 
-int APIENTRY WinMain(_In_ HINSTANCE /*hInstance*/,
+int APIENTRY wWinMain(_In_ HINSTANCE /*hInstance*/,
                      _In_opt_ HINSTANCE /*hPrevInstance*/,
-                     _In_ LPSTR /*lpCmdLine*/,
+                     _In_ LPWSTR /*lpCmdLine*/,
                      _In_ int /*nCmdShow*/) {
     try {
         CreateConsoleWindow();

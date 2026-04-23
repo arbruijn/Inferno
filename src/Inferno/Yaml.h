@@ -1,8 +1,8 @@
 #pragma once
 
 #include <c4/substr.hpp>
-#include <ryml/ryml_std.hpp>
-#include <ryml/ryml.hpp>
+#include <ryml_std.hpp>
+#include <ryml.hpp>
 #include "Types.h"
 #include "Utility.h"
 

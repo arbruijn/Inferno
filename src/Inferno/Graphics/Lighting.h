@@ -108,7 +108,7 @@ namespace Inferno::Graphics {
 
             uint32 lightGridBitMaskSizeBytes = lightGridCells * 4 * 4;
             _bitMask.Create("Light Bit Mask", 1, lightGridBitMaskSizeBytes);
-            _lightData.Create("Light Data", sizeof LightData, MAX_LIGHTS);
+            _lightData.Create("Light Data", sizeof(LightData), MAX_LIGHTS);
 
             _lightData.AddUnorderedAccessView(false);
             _lightGrid.AddUnorderedAccessView(false);

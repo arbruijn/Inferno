@@ -76,7 +76,7 @@ namespace DirectX::SimpleMath {
 }
 
 namespace Inferno {
-    consteval auto BIT(auto x) { return 1 << x; }
+    consteval auto BIT(auto x) { return 1U << x; }
 
     //constexpr void SafeRelease(auto x) {
     //    if (x != nullptr) {
@@ -176,11 +176,11 @@ namespace Inferno {
     //};
     using ArgumentException = std::invalid_argument;
     struct IndexOutOfRangeException final : std::exception {
-        const char* what() const override { return "Index out of range"; }
+        const char* what() const noexcept override { return "Index out of range"; }
     };
 
     struct NotImplementedException final : std::exception {
-        const char* what() const override { return "Not Implemented"; }
+        const char* what() const noexcept override { return "Not Implemented"; }
     };
 
     // ensure types are the expected size

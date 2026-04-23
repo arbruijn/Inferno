@@ -208,7 +208,7 @@ namespace Inferno {
 
         void Resize(ID3D12Device* device, uint size) {
             Size = size;
-            CreateUploadHeap(device, Resource, size * sizeof(T));
+            CreateUploadHeap(Resource, size * sizeof(T));
         }
 
         void Fill(ID3D12Device* device, span<T> src) {

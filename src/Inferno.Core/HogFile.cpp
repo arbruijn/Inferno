@@ -8,7 +8,12 @@ namespace Inferno {
         if (offset == 0)
             throw Exception("Hog entry offset cannot be 0");
 
+#ifdef __MINGW32__
+        std::string narrowFile(file.begin(), file.end());
+        std::ifstream stream(narrowFile, std::ifstream::binary);
+#else
         std::ifstream stream(file, std::ifstream::binary);
+#endif
 
         if (length == 0) {
             stream.seekg(0, stream.end);
