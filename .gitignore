@@ -376,3 +376,8 @@ dxc.exe
 *.HAM
 *.S22
 /src/Inferno/assets/*
+
+/assets
+/d1
+/d2
+/shaders
