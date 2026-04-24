@@ -113,6 +113,7 @@ namespace Inferno {
             void DrainQueuedAudioPackets() {
                 auto packets = Playback.TakeQueuedAudioPackets();
                 if (packets.empty()) {
+                    UpdateFrameTiming();
                     return;
                 }
 
@@ -173,6 +174,15 @@ namespace Inferno {
 
                 if (Audio) {
                     RefillAudioBuffersLocked(false);
+                }
+
+                UpdateFrameTiming();
+            }
+
+            void UpdateFrameTiming() {
+                const float cadence = static_cast<float>(Playback.Cadence().frameDurationSeconds);
+                if (cadence > 0.0f) {
+                    FrameTime = cadence;
                 }
             }
 
@@ -263,11 +273,7 @@ namespace Inferno {
                 }
 
                 DrainQueuedAudioPackets();
-
-                const float cadence = static_cast<float>(Playback.Cadence().frameDurationSeconds);
-                if (cadence > 0.0f) {
-                    FrameTime = cadence;
-                }
+                UpdateFrameTiming();
 
                 if (!LoadFrame(error)) {
                     return false;
@@ -346,6 +352,8 @@ namespace Inferno {
         if (!PsxMovieVisible) {
             return;
         }
+
+        movie.DrainQueuedAudioPackets();
 
         movie.Accumulator += dt;
         while (movie.Accumulator >= movie.FrameTime) {
