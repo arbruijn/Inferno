@@ -178,7 +178,7 @@ namespace Inferno {
             bool LoadFrame(std::string* error) {
                 Psx::PsxPlaybackBufferedFrame buffered;
                 if (!Playback.HasBufferedFrames()) {
-                    if (!Playback.FillVideoBuffer(16, error)) {
+                    if (!Playback.FillVideoBuffer(8, error)) {
                         DrainQueuedAudioPackets();
                         return false;
                     }
