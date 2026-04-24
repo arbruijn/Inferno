@@ -21,7 +21,8 @@
 namespace Inferno {
     namespace {
         constexpr float DEFAULT_MOVIE_FRAME_TIME = 1.0f / 30.0f;
-        constexpr std::size_t AUDIO_BUFFER_TARGET = 3;
+        constexpr std::size_t VIDEO_BUFFER_TARGET = 24;
+        constexpr std::size_t AUDIO_BUFFER_TARGET = 8;
 
         struct PsxMovieState {
             using AudioBuffer = std::shared_ptr<std::vector<std::int16_t>>;
@@ -177,8 +178,8 @@ namespace Inferno {
 
             bool LoadFrame(std::string* error) {
                 Psx::PsxPlaybackBufferedFrame buffered;
-                if (!Playback.HasBufferedFrames()) {
-                    if (!Playback.FillVideoBuffer(8, error)) {
+                if (Playback.BufferedFrameCount() < VIDEO_BUFFER_TARGET) {
+                    if (!Playback.FillVideoBuffer(VIDEO_BUFFER_TARGET, error)) {
                         DrainQueuedAudioPackets();
                         return false;
                     }
