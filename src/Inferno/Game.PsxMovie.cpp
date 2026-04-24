@@ -2,7 +2,12 @@
 #include "Game.PsxMovie.h"
 
 #include <algorithm>
+#include <atomic>
+#include <cstdint>
 #include <fstream>
+#include <deque>
+#include <memory>
+#include <mutex>
 
 #include "Game.h"
 #include "Game.Bindings.h"
@@ -16,8 +21,11 @@
 namespace Inferno {
     namespace {
         constexpr float DEFAULT_MOVIE_FRAME_TIME = 1.0f / 30.0f;
+        constexpr std::size_t AUDIO_BUFFER_TARGET = 3;
 
         struct PsxMovieState {
+            using AudioBuffer = std::shared_ptr<std::vector<std::int16_t>>;
+
             Psx::PsxIso9660Reader Iso;
             std::unique_ptr<std::ifstream> Image;
             std::unique_ptr<Psx::PsxReadStream> Stream;
@@ -26,12 +34,22 @@ namespace Inferno {
             Psx::PsxRgbFrame CurrentFrame;
             std::vector<uint32> RgbaPixels;
             Texture2D FrameTexture;
+            std::unique_ptr<DynamicSoundEffectInstance> Audio;
+            std::deque<Psx::PsxPlaybackAudioPacket> PendingAudioPackets;
+            // Keep submitted PCM alive until XAudio2 signals that each buffer finished.
+            std::deque<AudioBuffer> LiveAudioBuffers;
+            std::mutex AudioMutex;
             float FrameTime = DEFAULT_MOVIE_FRAME_TIME;
             float Accumulator = 0.0f;
             bool HasFrame = false;
             bool FrameDirty = false;
+            std::atomic<bool> AudioEnabled = true;
+            bool AudioStarted = false;
+            int AudioSampleRate = 0;
+            std::uint8_t AudioChannelCount = 0;
 
             void Reset() {
+                StopAudio();
                 Iso.Clear();
                 Image.reset();
                 Stream.reset();
@@ -44,23 +62,140 @@ namespace Inferno {
                 Accumulator = 0.0f;
                 HasFrame = false;
                 FrameDirty = false;
+                AudioEnabled = true;
+            }
+
+            void StopAudio() {
+                std::scoped_lock lock(AudioMutex);
+                if (Audio) {
+                    Audio->Stop();
+                }
+                Audio.reset();
+                PendingAudioPackets.clear();
+                LiveAudioBuffers.clear();
+                AudioStarted = false;
+                AudioSampleRate = 0;
+                AudioChannelCount = 0;
+                AudioEnabled = true;
+            }
+
+            void RefillAudioBuffersLocked(bool completedBuffer) {
+                if (!Audio || !AudioEnabled) {
+                    return;
+                }
+
+                if (completedBuffer && !LiveAudioBuffers.empty()) {
+                    LiveAudioBuffers.pop_front();
+                }
+
+                while (Audio->GetPendingBufferCount() < static_cast<int>(AUDIO_BUFFER_TARGET) &&
+                       !PendingAudioPackets.empty()) {
+                    auto pending = std::move(PendingAudioPackets.front());
+                    PendingAudioPackets.pop_front();
+
+                    auto buffer = std::make_shared<std::vector<std::int16_t>>(std::move(pending.pcm.samples));
+                    if (buffer->empty()) {
+                        continue;
+                    }
+
+                    const auto byteCount = buffer->size() * sizeof((*buffer)[0]);
+                    Audio->SubmitBuffer(reinterpret_cast<const std::uint8_t*>(buffer->data()), byteCount);
+                    LiveAudioBuffers.push_back(std::move(buffer));
+                }
+
+                if (!AudioStarted && Audio->GetPendingBufferCount() > 0) {
+                    Audio->Play();
+                    AudioStarted = true;
+                }
+            }
+
+            void DrainQueuedAudioPackets() {
+                auto packets = Playback.TakeQueuedAudioPackets();
+                if (packets.empty()) {
+                    return;
+                }
+
+                if (!AudioEnabled) {
+                    return;
+                }
+
+                std::scoped_lock lock(AudioMutex);
+                for (auto& packet : packets) {
+                    if (packet.pcm.samples.empty() || packet.pcm.sampleRate <= 0 || packet.pcm.channelCount == 0) {
+                        continue;
+                    }
+
+                    if (!Audio) {
+                        auto* engine = Sound::GetEngine();
+                        if (engine == nullptr) {
+                            AudioEnabled = false;
+                            return;
+                        }
+
+                        AudioSampleRate = packet.pcm.sampleRate;
+                        AudioChannelCount = packet.pcm.channelCount;
+                        try {
+                            Audio = std::make_unique<DynamicSoundEffectInstance>(
+                                engine,
+                                [this](DynamicSoundEffectInstance*) {
+                                    std::scoped_lock callbackLock(AudioMutex);
+                                    RefillAudioBuffersLocked(true);
+                                },
+                                AudioSampleRate,
+                                AudioChannelCount,
+                                16);
+                            Audio->SetVolume(1.0f);
+                        } catch (const std::exception& ex) {
+                            SPDLOG_WARN("Unable to start PSX movie audio playback: {}", ex.what());
+                            AudioEnabled = false;
+                            Audio.reset();
+                            PendingAudioPackets.clear();
+                            LiveAudioBuffers.clear();
+                            return;
+                        }
+                    }
+
+                    if (packet.pcm.sampleRate != AudioSampleRate || packet.pcm.channelCount != AudioChannelCount) {
+                        SPDLOG_WARN("PSX movie audio format changed during playback; disabling audio.");
+                        AudioEnabled = false;
+                        PendingAudioPackets.clear();
+                        LiveAudioBuffers.clear();
+                        if (Audio) {
+                            Audio->Stop();
+                            Audio.reset();
+                        }
+                        return;
+                    }
+
+                    PendingAudioPackets.push_back(std::move(packet));
+                }
+
+                if (Audio) {
+                    RefillAudioBuffersLocked(false);
+                }
             }
 
             bool LoadFrame(std::string* error) {
                 Psx::PsxPlaybackBufferedFrame buffered;
                 if (!Playback.HasBufferedFrames()) {
                     if (!Playback.FillVideoBuffer(8, error)) {
+                        DrainQueuedAudioPackets();
                         return false;
                     }
+                    DrainQueuedAudioPackets();
                 }
 
                 if (!Playback.HasBufferedFrames()) {
+                    DrainQueuedAudioPackets();
                     return false;
                 }
 
                 if (!Playback.TakeFrontVideoFrame(&buffered, error)) {
+                    DrainQueuedAudioPackets();
                     return false;
                 }
+
+                DrainQueuedAudioPackets();
 
                 CurrentFrame = std::move(buffered.frame);
                 if (CurrentFrame.width == 0 || CurrentFrame.height == 0 || CurrentFrame.pixels.empty()) {
@@ -125,6 +260,8 @@ namespace Inferno {
                 if (!Playback.Start(&Reader, error)) {
                     return false;
                 }
+
+                DrainQueuedAudioPackets();
 
                 const float cadence = static_cast<float>(Playback.Cadence().frameDurationSeconds);
                 if (cadence > 0.0f) {
