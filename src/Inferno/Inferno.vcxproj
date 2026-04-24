@@ -316,6 +316,12 @@
     <ClCompile Include="Formats\PCX.cpp" />
     <ClCompile Include="Physics.Capsule.cpp" />
     <ClCompile Include="Physics.cpp" />
+    <ClCompile Include="Psx\PsxIso9660.cpp" />
+    <ClCompile Include="Psx\PsxMdec.cpp" />
+    <ClCompile Include="Psx\PsxPlayback.cpp" />
+    <ClCompile Include="Psx\PsxStream.cpp" />
+    <ClCompile Include="Psx\PsxStr.cpp" />
+    <ClCompile Include="Psx\PsxXa.cpp" />
     <ClCompile Include="Graphics\Render.Queue.cpp" />
     <ClCompile Include="Graphics\PostProcess.cpp" />
     <ClCompile Include="Procedural.cpp" />
@@ -476,6 +482,12 @@
     <ClInclude Include="Formats\PCX.h" />
     <ClInclude Include="Physics.Capsule.h" />
     <ClInclude Include="Physics.h" />
+    <ClInclude Include="Psx\PsxIso9660.h" />
+    <ClInclude Include="Psx\PsxMdec.h" />
+    <ClInclude Include="Psx\PsxPlayback.h" />
+    <ClInclude Include="Psx\PsxStream.h" />
+    <ClInclude Include="Psx\PsxStr.h" />
+    <ClInclude Include="Psx\PsxXa.h" />
     <ClInclude Include="Procedural.h" />
     <ClInclude Include="Render.Beam.h" />
     <ClInclude Include="Render.Effect.h" />
