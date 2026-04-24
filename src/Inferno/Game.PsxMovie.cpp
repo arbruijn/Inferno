@@ -88,6 +88,11 @@ namespace Inferno {
                     LiveAudioBuffers.pop_front();
                 }
 
+                if (!AudioStarted) {
+                    Audio->Play();
+                    AudioStarted = true;
+                }
+
                 while (Audio->GetPendingBufferCount() < static_cast<int>(AUDIO_BUFFER_TARGET) &&
                        !PendingAudioPackets.empty()) {
                     auto pending = std::move(PendingAudioPackets.front());
@@ -101,11 +106,6 @@ namespace Inferno {
                     const auto byteCount = buffer->size() * sizeof((*buffer)[0]);
                     Audio->SubmitBuffer(reinterpret_cast<const std::uint8_t*>(buffer->data()), byteCount);
                     LiveAudioBuffers.push_back(std::move(buffer));
-                }
-
-                if (!AudioStarted && Audio->GetPendingBufferCount() > 0) {
-                    Audio->Play();
-                    AudioStarted = true;
                 }
             }
 
