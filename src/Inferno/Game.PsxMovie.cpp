@@ -19,6 +19,7 @@ namespace Inferno {
 
         struct PsxMovieState {
             Psx::PsxIso9660Reader Iso;
+            std::unique_ptr<std::ifstream> Image;
             std::unique_ptr<Psx::PsxReadStream> Stream;
             Psx::PsxStrReader Reader;
             Psx::PsxPlaybackSession Playback;
@@ -32,6 +33,7 @@ namespace Inferno {
 
             void Reset() {
                 Iso.Clear();
+                Image.reset();
                 Stream.reset();
                 Reader.Clear();
                 Playback = {};
@@ -99,13 +101,15 @@ namespace Inferno {
 
             bool OpenMovieStream(const std::string& filename, std::string* error) {
                 const auto isoPath = D1_FOLDER / "psx.bin";
-                std::ifstream image(isoPath, std::ios::binary);
-                if (!image) {
+                Image = std::make_unique<std::ifstream>(isoPath, std::ios::binary);
+                if (!*Image) {
                     if (error) *error = "Could not open PSX image: " + isoPath.string();
+                    Image.reset();
                     return false;
                 }
 
-                if (!Iso.Load(image, error)) {
+                if (!Iso.Load(*Image, error)) {
+                    Image.reset();
                     return false;
                 }
 
