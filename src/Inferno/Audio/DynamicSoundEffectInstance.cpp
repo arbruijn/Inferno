@@ -163,6 +163,10 @@ void DynamicSoundEffectInstance::Impl::SubmitBuffer(const uint8_t* pAudioData, u
     if (audioBytes > UINT32_MAX)
         throw std::out_of_range("SubmitBuffer");
 
+    if (!mBase.voice) {
+        mBase.AllocateVoice(&mWaveFormat);
+    }
+
     XAUDIO2_BUFFER buffer = {};
     buffer.AudioBytes = static_cast<UINT32>(audioBytes);
     buffer.pAudioData = pAudioData;
