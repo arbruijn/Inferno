@@ -410,11 +410,12 @@ namespace Inferno::Game {
 
             case GameState::Briefing: {
                 Input::SetMouseMode(Input::MouseMode::Normal);
-                if (!Game::Briefing.IsValid()) return;
+                if (!Game::Briefing.IsValid() && !Game::PsxMovieVisible) return;
                 break;
             }
 
             case GameState::LoadLevel:
+                StopPsxMovie();
                 Input::SetMouseMode(Input::MouseMode::Mouselook);
                 break;
 
@@ -715,9 +716,15 @@ namespace Inferno::Game {
                 break;
 
             case GameState::Briefing:
-                Game::BriefingVisible = true;
-                Game::Briefing.Update(dt);
-                DrawBriefing();
+                if (Game::PsxMovieVisible) {
+                    UpdatePsxMovie(dt);
+                    DrawBriefing();
+                }
+                else if (Game::Briefing.IsValid()) {
+                    Game::BriefingVisible = true;
+                    Game::Briefing.Update(dt);
+                    DrawBriefing();
+                }
                 break;
 
             case GameState::LoadLevel: {
@@ -972,7 +979,12 @@ namespace Inferno::Game {
                         Game::LoadLevel(hogPath, levelEntry, autosave); // Request a level load
 
                         if (showBriefing && !briefingName.empty()) {
-                            ShowBriefing(mission, levelNumber, level, briefingName, false);
+                            if (filesystem::exists(D1_FOLDER / "psx.bin") && ShowPsxMovie("DESCENT/INTRO.STR")) {
+                                // PSX movie replaces the text briefing when the disc image is available.
+                            }
+                            else {
+                                ShowBriefing(mission, levelNumber, level, briefingName, false);
+                            }
                         }
                         else {
                             Game::SetState(GameState::LoadLevel);

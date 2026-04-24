@@ -652,7 +652,10 @@ namespace Inferno::Render {
             MaterialsChanged = false;
         }
 
-        if (Game::BriefingVisible) {
+        if (Game::PsxMovieVisible) {
+            Game::DrawPsxMovie(ctx, Adapter->BriefingColorBuffer);
+        }
+        else if (Game::BriefingVisible) {
             DrawBriefing(ctx, Adapter->BriefingColorBuffer, Game::Briefing);
         }
 

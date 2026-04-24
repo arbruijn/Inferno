@@ -243,6 +243,7 @@ namespace Inferno::Game {
     }
 
     void UnloadMission() {
+        StopPsxMovie();
         Mission = {};
         Resources::UnmountAddonData();
     }

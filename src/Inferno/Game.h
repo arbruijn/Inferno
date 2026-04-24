@@ -5,6 +5,7 @@
 #include "Game.Navigation.h"
 #include "Game.Player.h"
 #include "Game.Briefing.h"
+#include "Game.PsxMovie.h"
 #include "Game.EscapeSequence.h"
 #include "HogFile.h"
 #include "Intersect.h"

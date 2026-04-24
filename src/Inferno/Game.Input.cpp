@@ -473,7 +473,10 @@ namespace Inferno {
                 return;
 
             case GameState::Briefing:
-                HandleBriefingInput();
+                if (Game::PsxMovieVisible)
+                    HandlePsxMovieInput();
+                else
+                    HandleBriefingInput();
                 return;
 
             case GameState::PhotoMode:

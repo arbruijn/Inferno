@@ -272,6 +272,8 @@ vaporization of the facility.
         if (!Game::Mission)
             return;
 
+        StopPsxMovie();
+
         if (!String::HasExtension(briefingName))
             briefingName += ".txb";
 
