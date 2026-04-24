@@ -1,6 +1,9 @@
 #include "PsxPlayback.h"
 
+#include <cmath>
 #include <utility>
+
+#include "logging.h"
 
 namespace Inferno::Psx {
 namespace {
@@ -144,9 +147,22 @@ bool PsxPlaybackSession::BufferAudioSector(const PsxStrSector& sector, std::stri
     }
 
     if (cadence_.framesSinceLastAudioPacket > 0 && audioPacket.durationSeconds > 0.0) {
-        cadence_.frameDurationSeconds =
+        const double newFrameDurationSeconds =
             audioPacket.durationSeconds / static_cast<double>(cadence_.framesSinceLastAudioPacket);
+        const bool cadenceChanged =
+            !cadence_.usingAudioCadence ||
+            std::abs(newFrameDurationSeconds - cadence_.frameDurationSeconds) > 1e-6;
+
+        cadence_.frameDurationSeconds = newFrameDurationSeconds;
         cadence_.usingAudioCadence = true;
+
+        if (cadenceChanged) {
+            const double fps = newFrameDurationSeconds > 0.0 ? 1.0 / newFrameDurationSeconds : 0.0;
+            SPDLOG_INFO("Detected PSX movie cadence: {:.3f} fps ({:.3f} ms/frame) from {} video frames between audio packets",
+                        fps,
+                        newFrameDurationSeconds * 1000.0,
+                        cadence_.framesSinceLastAudioPacket);
+        }
     }
 
     cadence_.framesSinceLastAudioPacket = 0;
