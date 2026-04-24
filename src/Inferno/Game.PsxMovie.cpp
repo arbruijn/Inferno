@@ -146,12 +146,12 @@ namespace Inferno {
         }
 
         bool IsDismissPressed() {
-            return Input::MouseButtonPressed(Input::MouseButtons::LeftClick) ||
+        return Input::MouseButtonPressed(Input::MouseButtons::LeftClick) ||
                    Input::MouseButtonPressed(Input::MouseButtons::RightClick) ||
-                   Input::OnKeyPressed(Keys::Space) ||
-                   Input::OnKeyPressed(Keys::Escape) ||
-                   Input::OnKeyPressed(Keys::Left) ||
-                   Input::OnKeyPressed(Keys::Right) ||
+                   Input::OnKeyPressed(Input::Keys::Space) ||
+                   Input::OnKeyPressed(Input::Keys::Escape) ||
+                   Input::OnKeyPressed(Input::Keys::Left) ||
+                   Input::OnKeyPressed(Input::Keys::Right) ||
                    Input::MenuActions.IsSet(MenuAction::Confirm) ||
                    Input::MenuActions.IsSet(MenuAction::Left) ||
                    Input::MenuActions.IsSet(MenuAction::Right) ||
@@ -188,9 +188,9 @@ namespace Inferno {
             return false;
         }
 
-        BriefingVisible = false;
+        Game::BriefingVisible = false;
         PsxMovieVisible = true;
-        SetState(GameState::Briefing);
+        Game::SetState(GameState::Briefing);
         Sound::StopMusic();
         return true;
     }
@@ -215,7 +215,7 @@ namespace Inferno {
                     SPDLOG_WARN("PSX movie playback ended or failed: {}", error);
                     movie.Stop();
                 }
-                SetState(GameState::LoadLevel);
+                Game::SetState(GameState::LoadLevel);
                 return;
             }
         }
@@ -231,7 +231,7 @@ namespace Inferno {
         }
 
         StopPsxMovie();
-        SetState(GameState::LoadLevel);
+        Game::SetState(GameState::LoadLevel);
     }
 
     void DrawPsxMovie(GraphicsContext& ctx, RenderTarget& target) {

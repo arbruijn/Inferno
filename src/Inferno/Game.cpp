@@ -410,7 +410,7 @@ namespace Inferno::Game {
 
             case GameState::Briefing: {
                 Input::SetMouseMode(Input::MouseMode::Normal);
-                if (!Game::Briefing.IsValid() && !Game::PsxMovieVisible) return;
+                if (!Game::Briefing.IsValid() && !PsxMovieVisible) return;
                 break;
             }
 
@@ -716,7 +716,7 @@ namespace Inferno::Game {
                 break;
 
             case GameState::Briefing:
-                if (Game::PsxMovieVisible) {
+                if (PsxMovieVisible) {
                     UpdatePsxMovie(dt);
                     DrawBriefing();
                 }
