@@ -33,6 +33,9 @@ public:
     bool Start(PsxStrReader* reader, std::string* error = nullptr);
     bool FillVideoBuffer(std::size_t targetBufferedFrames, std::string* error = nullptr);
     bool TakeFrontVideoFrame(PsxPlaybackBufferedFrame* frame, std::string* error = nullptr);
+    PsxPlaybackBufferedFrame* PeekNextFrame() {
+        return bufferedFrames_.empty() ? nullptr : &bufferedFrames_[0];
+    }
 
     std::vector<PsxPlaybackAudioPacket> TakeQueuedAudioPackets();
 

@@ -23,7 +23,7 @@ namespace Inferno {
     namespace {
         constexpr float DEFAULT_MOVIE_FRAME_TIME = 1.0f / 30.0f;
         constexpr std::size_t VIDEO_BUFFER_TARGET = 2;
-        constexpr std::size_t AUDIO_BUFFER_TARGET = 2;
+        constexpr std::size_t AUDIO_BUFFER_TARGET = 1;
 
         struct PsxMovieState {
             using AudioBuffer = std::shared_ptr<std::vector<std::int16_t>>;
@@ -47,6 +47,7 @@ namespace Inferno {
             bool FrameDirty = false;
             std::atomic<bool> AudioEnabled = true;
             bool AudioStarted = false;
+            bool AudioRunning = false;
             int AudioSampleRate = 0;
             std::uint8_t AudioChannelCount = 0;
 
@@ -85,6 +86,8 @@ namespace Inferno {
                 if (!Audio) {
                     return;
                 }
+
+                AudioRunning = true;
 
                 const auto pendingBufferCount = static_cast<std::size_t>(std::max(Audio->GetPendingBufferCount(), 0));
                 while (LiveAudioBuffers.size() > pendingBufferCount) {
@@ -216,6 +219,18 @@ namespace Inferno {
                 if (!Playback.HasBufferedFrames()) {
                     DrainQueuedAudioPackets();
                     return false;
+                }
+
+                if (!AudioRunning) {
+                    if (!CurrentFrame.width) {
+                        auto frame = Playback.PeekNextFrame();
+                        CurrentFrame.width = frame->frame.width;
+                        CurrentFrame.height= frame->frame.height;
+                        const std::size_t pixelCount = static_cast<std::size_t>(CurrentFrame.width) * CurrentFrame.height;
+                        RgbaPixels.resize(pixelCount);
+                        memset(&RgbaPixels[0], 0, pixelCount * sizeof(RgbaPixels[0]));
+                    }
+                    return true;
                 }
 
                 if (!Playback.TakeFrontVideoFrame(&buffered, error)) {
