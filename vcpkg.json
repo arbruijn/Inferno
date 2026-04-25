@@ -5,7 +5,7 @@
   "vcpkg-configuration": {
     "default-registry": {
       "kind": "builtin",
-      "baseline": "01be99fec01f777c4113ceea192a45115c69cdb7"
+      "baseline": "bd73016040a717bfd41f0470e013d6d2979545b3"
     }
   },
   "dependencies": [
@@ -43,6 +43,12 @@
     {
       "name": "d3d12-memory-allocator",
       "version>=": "3.0.1#0"
+    },
+    {
+      "name": "winpixevent"
+    },
+    {
+      "name": "directx-dxc"
     }
   ],
   "overrides": [

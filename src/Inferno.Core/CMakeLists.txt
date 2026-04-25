@@ -14,9 +14,10 @@ target_link_libraries(InfernoCore PUBLIC
     magic_enum::magic_enum
 )
 
-# lodepng
+if(NOT MSVC)
 target_include_directories(InfernoCore PRIVATE ${lodepng_SOURCE_DIR})
 target_sources(InfernoCore PRIVATE ${lodepng_SOURCE_DIR}/lodepng.cpp)
+endif()
 
 if(LINUX)
     target_include_directories(InfernoCore SYSTEM PUBLIC
@@ -49,6 +50,5 @@ endif()
 
 if(MSVC)
     target_compile_options(InfernoCore PRIVATE /W4)
-    target_precompile_headers(InfernoCore PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/../Inferno/pch.h)
+    target_precompile_headers(InfernoCore PRIVATE ../Inferno/pch.h)
 endif()

@@ -16,6 +16,29 @@ if(INFERNO_USE_VCPKG)
         CACHE STRING "Vcpkg toolchain file")
 endif()
 
+if(MSVC)
+find_package(fmt REQUIRED)
+find_package(spdlog REQUIRED)
+find_package(ryml REQUIRED)
+find_package(magic_enum REQUIRED)
+find_package(lodepng CONFIG REQUIRED)
+find_package(DirectXMath REQUIRED)
+find_package(DirectXTK12 REQUIRED)
+find_package(DirectXTex REQUIRED)
+find_package(D3D12MemoryAllocator REQUIRED)
+find_package(SDL3 REQUIRED)
+find_package(winpixevent CONFIG REQUIRED)
+find_package(directx-dxc CONFIG REQUIRED)
+
+add_definitions(-DUNICODE -D_UNICODE)
+#add_compile_options(-fsanitize=address)
+add_definitions(-D_DISABLE_VECTOR_ANNOTATION)
+include_directories(src/vendor)
+#"${CMAKE_CURRENT_SOURCE_DIR}/vcpkg_installed/x64-windows/x64-windows/include/directx")
+
+link_libraries(SDL3::SDL3 lodepng Microsoft::WinPixEventRuntime)
+
+else()
 # ─────────────────────────────────────────────────────────────────────────────
 # Dependencies (git submodules in deps/)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -45,6 +68,7 @@ set(DIRECTXTK12_SOURCE_DIR ${DEPS_DIR}/DirectXTK12 CACHE PATH "DirectXTK12 sourc
 
 # D3D12 Memory Allocator is header-only (used on Linux and MinGW)
 set(d3d12memalloc_SOURCE_DIR ${DEPS_DIR}/D3D12MemoryAllocator CACHE PATH "D3D12MemoryAllocator source directory")
+endif()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Platform detection

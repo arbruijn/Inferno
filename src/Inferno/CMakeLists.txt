@@ -11,6 +11,10 @@ file(GLOB_RECURSE INFERNO_HEADERS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
 )
 
+add_library(stb STATIC Audio/pcm/stb_vorbis.c)
+add_library(zipc STATIC zip/zip.c)
+link_libraries(stb zipc)
+
 # Exclude platform-specific files on Linux
 if(LINUX)
     list(FILTER INFERNO_SOURCES EXCLUDE REGEX "WindowsDialogs\\.cpp$")
@@ -108,7 +112,7 @@ add_library(pcm STATIC Audio/pcm/stb_vorbis.c)
 # ─────────────────────────────────────────────────────────────────────────────
 # Executable
 # ─────────────────────────────────────────────────────────────────────────────
-add_executable(Inferno
+add_executable(Inferno WIN32
     ${INFERNO_SOURCES}
     ${INFERNO_HEADERS}
 )
@@ -125,12 +129,14 @@ target_include_directories(Inferno PRIVATE
 
 target_precompile_headers(Inferno PRIVATE pch.h)
 
+if(NOT MSVC)
 find_package(OpenMP REQUIRED)
 target_link_libraries(Inferno PRIVATE OpenMP::OpenMP_CXX)
 target_link_libraries(Inferno PRIVATE zip pcm winmm x3daudio1_7 xaudio2_9 gomp
 	/mingw64/lib/libgomp.a
 	${CMAKE_SOURCE_DIR}/deps/dxc/bin/x64/dxcompiler.dll)
 target_link_options(Inferno PRIVATE -fopenmp)
+endif()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Link libraries
@@ -146,6 +152,8 @@ target_link_libraries(Inferno PRIVATE
 
 # lodepng
 target_include_directories(Inferno PRIVATE ${lodepng_SOURCE_DIR})
+
+target_include_directories(Inferno PRIVATE ${RYML_INCLUDE_DIR}/ryml)
 
 if(LINUX)
     target_include_directories(Inferno SYSTEM PRIVATE
@@ -211,14 +219,16 @@ elseif(MINGW)
     )
 
 else()
-    find_package(d3d12-memory-allocator CONFIG REQUIRED)
-    find_package(directx-headers CONFIG REQUIRED)
+    #find_package(d3d12-memory-allocator CONFIG REQUIRED)
+    #find_package(directx-headers CONFIG REQUIRED)
 
     target_link_libraries(Inferno PRIVATE
         Microsoft::DirectXTK12
         Microsoft::DirectXTex
         Microsoft::DirectX-Guids
-        d3d12-memory-allocator::D3D12MemoryAllocator
+        GPUOpen::D3D12MemoryAllocator
+        Microsoft::DirectXShaderCompiler
+        lodepng
         d3d12.lib
         dxgi.lib
         d3dcompiler.lib
@@ -226,6 +236,7 @@ else()
         dwmapi.lib
         shlwapi.lib
         comctl32.lib
+        winmm.lib
     )
 endif()
 

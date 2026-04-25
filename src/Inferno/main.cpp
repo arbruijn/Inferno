@@ -159,6 +159,18 @@ void QuaternionTests() {
 }
 
 struct RymlExceptionHandler {
+#if 1
+    ryml::Callbacks CreateCallbacks() {
+        return { this, nullptr, nullptr, RymlExceptionHandler::ThrowException };
+    }
+
+    static void ThrowException(const char* msg, size_t len, ryml::Location /*loc*/, void* /*this_*/) {
+        // loc gives the internal rmyl line which is not very useful
+        __debugbreak();
+        SPDLOG_WARN("RYML error: {} len: {}", msg, len);
+        throw std::runtime_error(msg);
+    }
+#else
     ryml::Callbacks CreateCallbacks() {
         ryml::Callbacks cb;
         cb.m_user_data = this;
@@ -170,6 +182,7 @@ struct RymlExceptionHandler {
         SPDLOG_WARN("RYML error: {}", std::string(msg.str, msg.len));
         throw std::runtime_error(std::string(msg.str, msg.len));
     }
+#endif
 };
 
 
