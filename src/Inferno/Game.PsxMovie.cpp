@@ -18,11 +18,12 @@
 #include "Psx/PsxPlayback.h"
 #include "SoundSystem.h"
 
+
 namespace Inferno {
     namespace {
         constexpr float DEFAULT_MOVIE_FRAME_TIME = 1.0f / 30.0f;
-        constexpr std::size_t VIDEO_BUFFER_TARGET = 24;
-        constexpr std::size_t AUDIO_BUFFER_TARGET = 8;
+        constexpr std::size_t VIDEO_BUFFER_TARGET = 2;
+        constexpr std::size_t AUDIO_BUFFER_TARGET = 2;
 
         struct PsxMovieState {
             using AudioBuffer = std::shared_ptr<std::vector<std::int16_t>>;
