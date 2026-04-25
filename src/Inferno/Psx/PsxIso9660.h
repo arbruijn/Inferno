@@ -21,6 +21,7 @@ struct PsxCdSectorLayout {
 
 inline constexpr PsxCdSectorLayout kPsxMode2_2048 = {2352, 24, 2048};
 inline constexpr PsxCdSectorLayout kPsxMode2_2336 = {2352, 16, 2336};
+inline constexpr PsxCdSectorLayout kPsxMode2_2352 = {2352, 0, 2352};
 
 struct PsxIsoDirectoryEntry {
     std::string name;
