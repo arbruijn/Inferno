@@ -18,4 +18,4 @@
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator.git
 [submodule "deps/DirectXTex"]
 	path = deps/DirectXTex
-	url = https://github.com/microsoft/DirectXTex.git
+	url = https://github.com/arbruijn/DirectXTex
