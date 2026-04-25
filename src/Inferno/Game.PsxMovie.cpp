@@ -51,6 +51,21 @@ namespace Inferno {
             int AudioSampleRate = 0;
             std::uint8_t AudioChannelCount = 0;
             std::size_t LoggedAudioBufferSubmissions = 0;
+            bool Presenting = false;
+
+            bool SetupEmptyFrame() {
+                auto frame = Playback.PeekNextFrame();
+                if (!frame)
+                    return false;
+                CurrentFrame.width = frame->frame.width;
+                CurrentFrame.height = frame->frame.height;
+                const std::size_t pixelCount = static_cast<std::size_t>(CurrentFrame.width) * CurrentFrame.height;
+                RgbaPixels.resize(pixelCount);
+                memset(&RgbaPixels[0], 0, pixelCount * sizeof(RgbaPixels[0]));
+                HasFrame = true;
+                FrameDirty = true;
+                return true;
+            }
 
             void Reset() {
                 StopAudio();
@@ -217,31 +232,23 @@ namespace Inferno {
                 Psx::PsxPlaybackBufferedFrame buffered;
                 if (Playback.BufferedFrameCount() < VIDEO_BUFFER_TARGET) {
                     if (!Playback.FillVideoBuffer(VIDEO_BUFFER_TARGET, error)) {
-                        DrainQueuedAudioPackets();
                         return false;
                     }
                     DrainQueuedAudioPackets();
                 }
 
                 if (!Playback.HasBufferedFrames()) {
-                    DrainQueuedAudioPackets();
                     return false;
                 }
 
                 if (!AudioRunning) {
-                    if (!CurrentFrame.width) {
-                        auto frame = Playback.PeekNextFrame();
-                        CurrentFrame.width = frame->frame.width;
-                        CurrentFrame.height = frame->frame.height;
-                        const std::size_t pixelCount = static_cast<std::size_t>(CurrentFrame.width) * CurrentFrame.height;
-                        RgbaPixels.resize(pixelCount);
-                        memset(&RgbaPixels[0], 0, pixelCount * sizeof(RgbaPixels[0]));
+                    if (!HasFrame) {
+                        SetupEmptyFrame();
                     }
                     return true;
                 }
 
                 if (!Playback.TakeFrontVideoFrame(&buffered, error)) {
-                    DrainQueuedAudioPackets();
                     return false;
                 }
 
@@ -314,11 +321,11 @@ namespace Inferno {
                     return false;
                 }
 
-                DrainQueuedAudioPackets();
-
-                if (!LoadFrame(error)) {
-                    return false;
+                if (!Playback.FillVideoBuffer(VIDEO_BUFFER_TARGET, error)) {
+                     return false;
                 }
+
+                SetupEmptyFrame();
 
                 return true;
             }
@@ -394,9 +401,19 @@ namespace Inferno {
             return;
         }
 
+        // wait until frametimes are stable
+        if (!movie.Presenting && dt > movie.FrameTime) {
+            return;
+        }
+
+        movie.Presenting = true;
+
         movie.DrainQueuedAudioPackets();
 
-        movie.Accumulator += dt;
+        if (movie.AudioRunning) {
+            movie.Accumulator += dt;
+            totalTime += dt;
+        }
         while (movie.Accumulator >= movie.FrameTime) {
             movie.Accumulator -= movie.FrameTime;
 
