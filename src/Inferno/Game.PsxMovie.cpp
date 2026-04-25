@@ -81,17 +81,32 @@ namespace Inferno {
                 AudioEnabled = true;
             }
 
-            void RefillAudioBuffersLocked(bool completedBuffer) {
+            void ReleaseCompletedAudioBuffersLocked() {
+                if (!Audio) {
+                    return;
+                }
+
+                const auto pendingBufferCount = static_cast<std::size_t>(std::max(Audio->GetPendingBufferCount(), 0));
+                while (LiveAudioBuffers.size() > pendingBufferCount) {
+                    LiveAudioBuffers.pop_front();
+                }
+            }
+
+            void RefillAudioBuffersLocked() {
                 if (!Audio || !AudioEnabled) {
                     return;
                 }
 
-                if (completedBuffer && !LiveAudioBuffers.empty()) {
-                    LiveAudioBuffers.pop_front();
-                }
+                // DynamicSoundEffectInstance reuses the same callback for both
+                // real OnBufferEnd notifications and the initial "buffer needed"
+                // wake-up from Play(). Retire submitted PCM by comparing it with
+                // XAudio2's actual queued buffer count instead of assuming one
+                // buffer completed per callback.
+                ReleaseCompletedAudioBuffersLocked();
 
-                while (Audio->GetPendingBufferCount() < static_cast<int>(AUDIO_BUFFER_TARGET) &&
-                       !PendingAudioPackets.empty()) {
+                int pendingBufferCount = Audio->GetPendingBufferCount();
+
+                while (pendingBufferCount < static_cast<int>(AUDIO_BUFFER_TARGET) && !PendingAudioPackets.empty()) {
                     auto pending = std::move(PendingAudioPackets.front());
                     PendingAudioPackets.pop_front();
 
@@ -103,9 +118,10 @@ namespace Inferno {
                     const auto byteCount = buffer->size() * sizeof((*buffer)[0]);
                     Audio->SubmitBuffer(reinterpret_cast<const std::uint8_t*>(buffer->data()), byteCount);
                     LiveAudioBuffers.push_back(std::move(buffer));
+                    ++pendingBufferCount;
                 }
 
-                if (!AudioStarted && Audio->GetPendingBufferCount() > 0) {
+                if (!AudioStarted && pendingBufferCount > 0) {
                     Audio->Play();
                     AudioStarted = true;
                 }
@@ -142,7 +158,7 @@ namespace Inferno {
                                 engine,
                                 [this](DynamicSoundEffectInstance*) {
                                     std::scoped_lock callbackLock(AudioMutex);
-                                    RefillAudioBuffersLocked(true);
+                                    RefillAudioBuffersLocked();
                                 },
                                 AudioSampleRate,
                                 AudioChannelCount,
@@ -174,7 +190,7 @@ namespace Inferno {
                 }
 
                 if (Audio) {
-                    RefillAudioBuffersLocked(false);
+                    RefillAudioBuffersLocked();
                 }
 
                 UpdateFrameTiming();
