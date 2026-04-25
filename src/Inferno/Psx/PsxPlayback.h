@@ -13,14 +13,16 @@
 
 namespace Inferno::Psx {
 
+/*
 struct PsxPlaybackCadence {
-    double frameDurationSeconds = 1.0 / 30.0;
+    double frameDurationSeconds = 1.0 / 15.0;
     bool usingSectorCadence = false;
 };
+*/
 
 struct PsxPlaybackBufferedFrame {
     std::uint32_t frameNumber = 0;
-    double durationSeconds = 1.0 / 30.0;
+    double durationSeconds = 1.0 / 15.0;
     PsxRgbFrame frame;
 };
 
@@ -40,7 +42,7 @@ public:
 
     std::vector<PsxPlaybackAudioPacket> TakeQueuedAudioPackets();
 
-    const PsxPlaybackCadence& Cadence() const noexcept;
+    //const PsxPlaybackCadence& Cadence() const noexcept;
     std::size_t BufferedFrameCount() const noexcept;
     std::size_t BufferedAudioPacketsCount() const noexcept { return queuedAudioPackets_.size(); }
     bool HasBufferedFrames() const noexcept;
@@ -60,9 +62,9 @@ private:
     PsxXaDecoder audioDecoder_;
     std::deque<PsxPlaybackBufferedFrame> bufferedFrames_;
     std::vector<PsxPlaybackAudioPacket> queuedAudioPackets_;
-    PsxPlaybackCadence cadence_;
+    //PsxPlaybackCadence cadence_;
     std::optional<std::size_t> previousFrameEndSector_;
-    bool loggedFirstAudioPacket_ = false;
+    //bool loggedFirstAudioPacket_ = false;
     bool sawAudioPacket_ = false;
     bool reachedEndOfStream_ = false;
 };

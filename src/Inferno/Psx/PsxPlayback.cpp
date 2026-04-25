@@ -57,9 +57,9 @@ std::vector<PsxPlaybackAudioPacket> PsxPlaybackSession::TakeQueuedAudioPackets()
     return audioPackets;
 }
 
-const PsxPlaybackCadence& PsxPlaybackSession::Cadence() const noexcept {
-    return cadence_;
-}
+//const PsxPlaybackCadence& PsxPlaybackSession::Cadence() const noexcept {
+//    return cadence_;
+//}
 
 std::size_t PsxPlaybackSession::BufferedFrameCount() const noexcept {
     return bufferedFrames_.size();
@@ -131,6 +131,7 @@ bool PsxPlaybackSession::BufferDecodedFrame(const PsxStrFrame& sourceFrame, std:
         return false;
     }
 
+    #if 0
     if (!sourceFrame.sectorIndices.empty()) {
         const auto currentFrameEndSector = sourceFrame.sectorIndices.back();
         if (previousFrameEndSector_.has_value() && currentFrameEndSector > *previousFrameEndSector_) {
@@ -159,8 +160,9 @@ bool PsxPlaybackSession::BufferDecodedFrame(const PsxStrFrame& sourceFrame, std:
 
         previousFrameEndSector_ = currentFrameEndSector;
     }
+    #endif
 
-    bufferedFrame.durationSeconds = cadence_.frameDurationSeconds;
+    bufferedFrame.durationSeconds = 1.0f / 15.0f; //cadence_.frameDurationSeconds;
     bufferedFrames_.push_back(std::move(bufferedFrame));
     return true;
 }
@@ -176,6 +178,7 @@ bool PsxPlaybackSession::BufferAudioSector(const PsxStrSector& sector, std::stri
             static_cast<double>(audioPacket.pcm.sampleFrames) / static_cast<double>(audioPacket.pcm.sampleRate);
     }
 
+/*
     if (!loggedFirstAudioPacket_) {
         SPDLOG_INFO("PSX movie audio packet: {} Hz, {} channels, {} sample frames ({:.3f} ms), coding=0x{:02X}",
                     audioPacket.pcm.sampleRate,
@@ -185,6 +188,7 @@ bool PsxPlaybackSession::BufferAudioSector(const PsxStrSector& sector, std::stri
                     static_cast<unsigned>(sector.cdxa.codingInfo));
         loggedFirstAudioPacket_ = true;
     }
+*/
 
     queuedAudioPackets_.push_back(std::move(audioPacket));
     sawAudioPacket_ = true;
@@ -196,9 +200,9 @@ void PsxPlaybackSession::Reset() noexcept {
     audioDecoder_.Reset();
     bufferedFrames_.clear();
     queuedAudioPackets_.clear();
-    cadence_ = PsxPlaybackCadence{};
-    previousFrameEndSector_.reset();
-    loggedFirstAudioPacket_ = false;
+    //cadence_ = PsxPlaybackCadence{};
+    //previousFrameEndSector_.reset();
+    //loggedFirstAudioPacket_ = false;
     sawAudioPacket_ = false;
     reachedEndOfStream_ = false;
 }
