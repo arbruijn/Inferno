@@ -260,7 +260,7 @@ namespace Inferno {
                     return false;
                 }
 
-                Stream = Iso.OpenFile(filename, Psx::kPsxMode2_2336, error);
+                Stream = Iso.OpenFile(filename, Psx::kPsxMode2_2352, error);
                 if (!Stream) {
                     return false;
                 }
