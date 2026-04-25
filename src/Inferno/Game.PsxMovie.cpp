@@ -50,6 +50,7 @@ namespace Inferno {
             bool AudioRunning = false;
             int AudioSampleRate = 0;
             std::uint8_t AudioChannelCount = 0;
+            std::size_t LoggedAudioBufferSubmissions = 0;
 
             void Reset() {
                 StopAudio();
@@ -79,6 +80,7 @@ namespace Inferno {
                 AudioStarted = false;
                 AudioSampleRate = 0;
                 AudioChannelCount = 0;
+                LoggedAudioBufferSubmissions = 0;
                 AudioEnabled = true;
             }
 
@@ -118,6 +120,21 @@ namespace Inferno {
                         continue;
                     }
 
+                    if (LoggedAudioBufferSubmissions < 8) {
+                        const double bufferDurationMs =
+                            pending.pcm.sampleRate > 0
+                                ? 1000.0 * static_cast<double>(pending.pcm.sampleFrames) / static_cast<double>(pending.pcm.sampleRate)
+                                : 0.0;
+                        SPDLOG_INFO("Queued PSX movie audio buffer #{}: {} sample frames, {} channels, {:.3f} ms, XA queue depth {} -> {}",
+                                    LoggedAudioBufferSubmissions + 1,
+                                    pending.pcm.sampleFrames,
+                                    pending.pcm.channelCount,
+                                    bufferDurationMs,
+                                    pendingBufferCount,
+                                    pendingBufferCount + 1);
+                        ++LoggedAudioBufferSubmissions;
+                    }
+
                     const auto byteCount = buffer->size() * sizeof((*buffer)[0]);
                     Audio->SubmitBuffer(reinterpret_cast<const std::uint8_t*>(buffer->data()), byteCount);
                     LiveAudioBuffers.push_back(std::move(buffer));
@@ -133,7 +150,6 @@ namespace Inferno {
             void DrainQueuedAudioPackets() {
                 auto packets = Playback.TakeQueuedAudioPackets();
                 if (packets.empty()) {
-                    UpdateFrameTiming();
                     return;
                 }
 
@@ -195,15 +211,6 @@ namespace Inferno {
                 if (Audio) {
                     RefillAudioBuffersLocked();
                 }
-
-                UpdateFrameTiming();
-            }
-
-            void UpdateFrameTiming() {
-                const float cadence = static_cast<float>(Playback.Cadence().frameDurationSeconds);
-                if (cadence > 0.0f) {
-                    FrameTime = cadence;
-                }
             }
 
             bool LoadFrame(std::string* error) {
@@ -225,7 +232,7 @@ namespace Inferno {
                     if (!CurrentFrame.width) {
                         auto frame = Playback.PeekNextFrame();
                         CurrentFrame.width = frame->frame.width;
-                        CurrentFrame.height= frame->frame.height;
+                        CurrentFrame.height = frame->frame.height;
                         const std::size_t pixelCount = static_cast<std::size_t>(CurrentFrame.width) * CurrentFrame.height;
                         RgbaPixels.resize(pixelCount);
                         memset(&RgbaPixels[0], 0, pixelCount * sizeof(RgbaPixels[0]));
@@ -241,6 +248,9 @@ namespace Inferno {
                 DrainQueuedAudioPackets();
 
                 CurrentFrame = std::move(buffered.frame);
+                if (buffered.durationSeconds > 0.0) {
+                    FrameTime = static_cast<float>(buffered.durationSeconds);
+                }
                 if (CurrentFrame.width == 0 || CurrentFrame.height == 0 || CurrentFrame.pixels.empty()) {
                     if (error) *error = "Encountered an empty PSX movie frame.";
                     return false;
@@ -305,7 +315,6 @@ namespace Inferno {
                 }
 
                 DrainQueuedAudioPackets();
-                UpdateFrameTiming();
 
                 if (!LoadFrame(error)) {
                     return false;
@@ -326,7 +335,7 @@ namespace Inferno {
         }
 
         bool IsDismissPressed() {
-        return Input::MouseButtonPressed(Input::MouseButtons::LeftClick) ||
+            return Input::MouseButtonPressed(Input::MouseButtons::LeftClick) ||
                    Input::MouseButtonPressed(Input::MouseButtons::RightClick) ||
                    Input::OnKeyPressed(Input::Keys::Space) ||
                    Input::OnKeyPressed(Input::Keys::Escape) ||

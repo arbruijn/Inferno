@@ -7,6 +7,7 @@
 
 namespace Inferno::Psx {
 namespace {
+constexpr double kPsxCdDoubleSpeedSectorsPerSecond = 150.0;
 
 void SetError(std::string message, std::string* error) {
     if (error != nullptr) {
@@ -130,8 +131,37 @@ bool PsxPlaybackSession::BufferDecodedFrame(const PsxStrFrame& sourceFrame, std:
         return false;
     }
 
+    if (!sourceFrame.sectorIndices.empty()) {
+        const auto currentFrameEndSector = sourceFrame.sectorIndices.back();
+        if (previousFrameEndSector_.has_value() && currentFrameEndSector > *previousFrameEndSector_) {
+            const auto sectorsBetweenFrames = currentFrameEndSector - *previousFrameEndSector_;
+            const double newFrameDurationSeconds =
+                static_cast<double>(sectorsBetweenFrames) / kPsxCdDoubleSpeedSectorsPerSecond;
+            const bool cadenceChanged =
+                !cadence_.usingSectorCadence ||
+                std::abs(newFrameDurationSeconds - cadence_.frameDurationSeconds) > 1e-6;
+
+            cadence_.frameDurationSeconds = newFrameDurationSeconds;
+            cadence_.usingSectorCadence = true;
+
+            if (!bufferedFrames_.empty()) {
+                bufferedFrames_.back().durationSeconds = newFrameDurationSeconds;
+            }
+
+            if (cadenceChanged) {
+                const double fps = newFrameDurationSeconds > 0.0 ? 1.0 / newFrameDurationSeconds : 0.0;
+                SPDLOG_INFO("Detected PSX movie cadence: {:.3f} fps ({:.3f} ms/frame) from {} CD sectors between video frames",
+                            fps,
+                            newFrameDurationSeconds * 1000.0,
+                            sectorsBetweenFrames);
+            }
+        }
+
+        previousFrameEndSector_ = currentFrameEndSector;
+    }
+
+    bufferedFrame.durationSeconds = cadence_.frameDurationSeconds;
     bufferedFrames_.push_back(std::move(bufferedFrame));
-    ++cadence_.framesSinceLastAudioPacket;
     return true;
 }
 
@@ -146,26 +176,16 @@ bool PsxPlaybackSession::BufferAudioSector(const PsxStrSector& sector, std::stri
             static_cast<double>(audioPacket.pcm.sampleFrames) / static_cast<double>(audioPacket.pcm.sampleRate);
     }
 
-    if (cadence_.framesSinceLastAudioPacket > 0 && audioPacket.durationSeconds > 0.0) {
-        const double newFrameDurationSeconds =
-            audioPacket.durationSeconds / static_cast<double>(cadence_.framesSinceLastAudioPacket);
-        const bool cadenceChanged =
-            !cadence_.usingAudioCadence ||
-            std::abs(newFrameDurationSeconds - cadence_.frameDurationSeconds) > 1e-6;
-
-        cadence_.frameDurationSeconds = newFrameDurationSeconds;
-        cadence_.usingAudioCadence = true;
-
-        if (cadenceChanged) {
-            const double fps = newFrameDurationSeconds > 0.0 ? 1.0 / newFrameDurationSeconds : 0.0;
-            SPDLOG_INFO("Detected PSX movie cadence: {:.3f} fps ({:.3f} ms/frame) from {} video frames between audio packets",
-                        fps,
-                        newFrameDurationSeconds * 1000.0,
-                        cadence_.framesSinceLastAudioPacket);
-        }
+    if (!loggedFirstAudioPacket_) {
+        SPDLOG_INFO("PSX movie audio packet: {} Hz, {} channels, {} sample frames ({:.3f} ms), coding=0x{:02X}",
+                    audioPacket.pcm.sampleRate,
+                    audioPacket.pcm.channelCount,
+                    audioPacket.pcm.sampleFrames,
+                    audioPacket.durationSeconds * 1000.0,
+                    static_cast<unsigned>(sector.cdxa.codingInfo));
+        loggedFirstAudioPacket_ = true;
     }
 
-    cadence_.framesSinceLastAudioPacket = 0;
     queuedAudioPackets_.push_back(std::move(audioPacket));
     sawAudioPacket_ = true;
     return true;
@@ -177,6 +197,8 @@ void PsxPlaybackSession::Reset() noexcept {
     bufferedFrames_.clear();
     queuedAudioPackets_.clear();
     cadence_ = PsxPlaybackCadence{};
+    previousFrameEndSector_.reset();
+    loggedFirstAudioPacket_ = false;
     sawAudioPacket_ = false;
     reachedEndOfStream_ = false;
 }

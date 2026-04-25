@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -14,12 +15,12 @@ namespace Inferno::Psx {
 
 struct PsxPlaybackCadence {
     double frameDurationSeconds = 1.0 / 30.0;
-    std::size_t framesSinceLastAudioPacket = 0;
-    bool usingAudioCadence = false;
+    bool usingSectorCadence = false;
 };
 
 struct PsxPlaybackBufferedFrame {
     std::uint32_t frameNumber = 0;
+    double durationSeconds = 1.0 / 30.0;
     PsxRgbFrame frame;
 };
 
@@ -60,6 +61,8 @@ private:
     std::deque<PsxPlaybackBufferedFrame> bufferedFrames_;
     std::vector<PsxPlaybackAudioPacket> queuedAudioPackets_;
     PsxPlaybackCadence cadence_;
+    std::optional<std::size_t> previousFrameEndSector_;
+    bool loggedFirstAudioPacket_ = false;
     bool sawAudioPacket_ = false;
     bool reachedEndOfStream_ = false;
 };
