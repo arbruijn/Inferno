@@ -38,6 +38,7 @@ public:
 
     const PsxPlaybackCadence& Cadence() const noexcept;
     std::size_t BufferedFrameCount() const noexcept;
+    std::size_t BufferedAudioPacketsCount() const noexcept { return queuedAudioPackets_.size(); }
     bool HasBufferedFrames() const noexcept;
     bool ReachedEndOfStream() const noexcept;
     bool SawAudioPacket() const noexcept;
