@@ -38,22 +38,22 @@ public:
     bool Load(const std::vector<std::uint8_t>& data, std::string* error = nullptr);
     bool Load(std::istream& input, std::string* error = nullptr);
 
-    bool GetEntry(const std::string& path, PsxIsoDirectoryEntry* entry, std::string* error = nullptr) const;
+    bool GetEntry(const std::string& path, PsxIsoDirectoryEntry* entry, std::string* error = nullptr);
     bool ListDirectory(const std::string& path,
                        std::vector<PsxIsoDirectoryEntry>* entries,
-                       std::string* error = nullptr) const;
+                       std::string* error = nullptr);
     bool ReadExtent(std::uint32_t extentLba,
                     std::size_t size,
                     std::vector<std::uint8_t>* output,
                     const PsxCdSectorLayout& layout = kPsxMode2_2048,
-                    std::string* error = nullptr) const;
+                    std::string* error = nullptr);
     bool ReadFile(const std::string& path,
                   std::vector<std::uint8_t>* output,
                   const PsxCdSectorLayout& layout = kPsxMode2_2048,
-                  std::string* error = nullptr) const;
+                  std::string* error = nullptr);
     std::unique_ptr<PsxReadStream> OpenFile(const std::string& path,
                                             const PsxCdSectorLayout& layout = kPsxMode2_2048,
-                                            std::string* error = nullptr) const;
+                                            std::string* error = nullptr);
 
     const PsxIsoDirectoryEntry& RootEntry() const noexcept;
     const std::string& SystemId() const noexcept;
@@ -74,19 +74,19 @@ private:
     bool ReadBytes(std::uint64_t absoluteOffset,
                    std::size_t size,
                    std::vector<std::uint8_t>* output,
-                   std::string* error) const;
+                   std::string* error);
     bool ReadLogicalSector(std::uint32_t lba,
                            std::vector<std::uint8_t>* output,
-                           std::string* error) const;
+                           std::string* error);
     bool ParseDirectoryRecord(const std::uint8_t* record,
                               std::size_t size,
                               PsxIsoDirectoryEntry* entry) const;
     bool ReadDirectoryEntries(const PsxIsoDirectoryEntry& entry,
                               std::vector<PsxIsoDirectoryEntry>* entries,
-                              std::string* error) const;
+                              std::string* error);
     bool ResolveEntry(const std::string& path,
                       PsxIsoDirectoryEntry* entry,
-                      std::string* error) const;
+                      std::string* error);
     void SetError(std::string message, std::string* error) const;
 
     friend class PsxIsoFileStream;
@@ -97,6 +97,7 @@ private:
     std::istream* stream_ = nullptr;
     std::uint64_t streamBaseOffset_ = 0;
     std::uint64_t streamSize_ = 0;
+    std::uint64_t streamLastPos_ = 0;
 
     std::string systemId_;
     std::string volumeId_;

@@ -70,7 +70,7 @@ bool IsoNamesMatch(const std::string& recordName, const std::string& requestedNa
 
 class PsxIsoFileStream final : public PsxReadStream {
 public:
-    PsxIsoFileStream(const PsxIso9660Reader* owner,
+    PsxIsoFileStream(PsxIso9660Reader* owner,
                      std::uint32_t extentLba,
                      std::size_t size,
                      PsxCdSectorLayout layout)
@@ -138,7 +138,7 @@ public:
     }
 
 private:
-    const PsxIso9660Reader* owner_ = nullptr;
+    PsxIso9660Reader* owner_ = nullptr;
     std::uint32_t extentLba_ = 0;
     std::size_t size_ = 0;
     std::size_t position_ = 0;
@@ -260,7 +260,7 @@ bool PsxIso9660Reader::Initialize(std::string* error) {
 bool PsxIso9660Reader::ReadBytes(std::uint64_t absoluteOffset,
                                  std::size_t size,
                                  std::vector<std::uint8_t>* output,
-                                 std::string* error) const {
+                                 std::string* error) {
     if (output == nullptr) {
         SetError("PsxIso9660Reader requires a non-null output buffer.", error);
         return false;
@@ -289,11 +289,15 @@ bool PsxIso9660Reader::ReadBytes(std::uint64_t absoluteOffset,
         }
 
         output->assign(size, 0);
+
         stream_->clear();
-        stream_->seekg(static_cast<std::streamoff>(streamBaseOffset_ + absoluteOffset), std::ios::beg);
-        if (!stream_->good()) {
-            SetError("PsxIso9660Reader failed to seek within the image.", error);
-            return false;
+        if (streamBaseOffset_ + absoluteOffset != streamLastPos_) {
+            stream_->seekg(static_cast<std::streamoff>(streamBaseOffset_ + absoluteOffset), std::ios::beg);
+            if (!stream_->good()) {
+                SetError("PsxIso9660Reader failed to seek within the image.", error);
+                return false;
+            }
+            streamLastPos_ = streamBaseOffset_ + absoluteOffset;
         }
 
         if (size != 0) {
@@ -302,6 +306,7 @@ bool PsxIso9660Reader::ReadBytes(std::uint64_t absoluteOffset,
                 SetError("PsxIso9660Reader encountered a truncated image while reading.", error);
                 return false;
             }
+            streamLastPos_ += size;
         }
 
         return true;
@@ -313,7 +318,7 @@ bool PsxIso9660Reader::ReadBytes(std::uint64_t absoluteOffset,
 
 bool PsxIso9660Reader::ReadLogicalSector(std::uint32_t lba,
                                          std::vector<std::uint8_t>* output,
-                                         std::string* error) const {
+                                         std::string* error) {
     const std::uint64_t offset =
         static_cast<std::uint64_t>(lba) * kPsxMode2_2048.rawSectorSize + kPsxMode2_2048.payloadOffset;
     return ReadBytes(offset, kPsxMode2_2048.payloadSize, output, error);
@@ -355,7 +360,7 @@ bool PsxIso9660Reader::ParseDirectoryRecord(const std::uint8_t* record,
 
 bool PsxIso9660Reader::ReadDirectoryEntries(const PsxIsoDirectoryEntry& entry,
                                             std::vector<PsxIsoDirectoryEntry>* entries,
-                                            std::string* error) const {
+                                            std::string* error) {
     if (entries == nullptr) {
         SetError("PsxIso9660Reader::ReadDirectoryEntries requires a non-null output vector.", error);
         return false;
@@ -397,7 +402,7 @@ bool PsxIso9660Reader::ReadDirectoryEntries(const PsxIsoDirectoryEntry& entry,
 
 bool PsxIso9660Reader::ResolveEntry(const std::string& path,
                                     PsxIsoDirectoryEntry* entry,
-                                    std::string* error) const {
+                                    std::string* error) {
     if (sourceKind_ == SourceKind::None) {
         SetError("PsxIso9660Reader has no loaded image.", error);
         return false;
@@ -448,13 +453,13 @@ bool PsxIso9660Reader::ResolveEntry(const std::string& path,
 
 bool PsxIso9660Reader::GetEntry(const std::string& path,
                                 PsxIsoDirectoryEntry* entry,
-                                std::string* error) const {
+                                std::string* error) {
     return ResolveEntry(path, entry, error);
 }
 
 bool PsxIso9660Reader::ListDirectory(const std::string& path,
                                      std::vector<PsxIsoDirectoryEntry>* entries,
-                                     std::string* error) const {
+                                     std::string* error) {
     PsxIsoDirectoryEntry directory;
     if (!ResolveEntry(path, &directory, error)) {
         return false;
@@ -466,7 +471,7 @@ bool PsxIso9660Reader::ReadExtent(std::uint32_t extentLba,
                                   std::size_t size,
                                   std::vector<std::uint8_t>* output,
                                   const PsxCdSectorLayout& layout,
-                                  std::string* error) const {
+                                  std::string* error) {
     if (output == nullptr) {
         SetError("PsxIso9660Reader::ReadExtent requires a non-null output buffer.", error);
         return false;
@@ -503,7 +508,7 @@ bool PsxIso9660Reader::ReadExtent(std::uint32_t extentLba,
 bool PsxIso9660Reader::ReadFile(const std::string& path,
                                 std::vector<std::uint8_t>* output,
                                 const PsxCdSectorLayout& layout,
-                                std::string* error) const {
+                                std::string* error) {
     PsxIsoDirectoryEntry entry;
     if (!ResolveEntry(path, &entry, error)) {
         return false;
@@ -527,7 +532,7 @@ bool PsxIso9660Reader::ReadFile(const std::string& path,
 
 std::unique_ptr<PsxReadStream> PsxIso9660Reader::OpenFile(const std::string& path,
                                                           const PsxCdSectorLayout& layout,
-                                                          std::string* error) const {
+                                                          std::string* error) {
     PsxIsoDirectoryEntry entry;
     if (!ResolveEntry(path, &entry, error)) {
         return nullptr;
