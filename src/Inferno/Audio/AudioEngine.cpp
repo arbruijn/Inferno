@@ -474,7 +474,7 @@ HRESULT AudioEngine::Impl::Reset(const WAVEFORMATEX* wfx, const wchar_t* deviceI
     masterChannels = details.InputChannels;
     masterRate = details.InputSampleRate;
 
-    DebugTrace("INFO: mastering voice has %u channels, %u sample rate, %08X channel mask\n",
+    SPDLOG_INFO("INFO: mastering voice has {} channels, {} sample rate, {} channel mask\n",
         masterChannels, masterRate, masterChannelMask);
 
     if (mMasterVolume != 1.f)

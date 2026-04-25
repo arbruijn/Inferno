@@ -20,6 +20,11 @@ using namespace Inferno;
 
 // Internal object implementation class.
 class DynamicSoundEffectInstance::Impl : public IVoiceNotify {
+        uint64_t GetClockTimeNs() const {
+            using namespace std::chrono;
+            auto time = (uint64_t)duration_cast<nanoseconds>(steady_clock::now().time_since_epoch()).count();
+            return time;
+        }
 public:
     Impl(_In_ AudioEngine* engine,
          _In_ DynamicSoundEffectInstance* object,
@@ -93,6 +98,12 @@ public:
 
     // IVoiceNotify
     void __cdecl OnBufferEnd() override {
+                static uint64_t last;
+                uint64_t cur = GetClockTimeNs();
+                if (last) {
+                    printf("%f audiobuf\n", (cur - last) / 1e9);
+                }
+                last = cur;
         SetEvent(mBufferEvent.get());
     }
 

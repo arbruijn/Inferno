@@ -3,11 +3,13 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <cstdint>
 #include <fstream>
 #include <deque>
 #include <memory>
 #include <mutex>
+#include <vector>
 
 #include "Game.h"
 #include "Game.Bindings.h"
@@ -24,6 +26,80 @@ namespace Inferno {
         constexpr float DEFAULT_MOVIE_FRAME_TIME = 1.0f / 15.0f;
         constexpr std::size_t VIDEO_BUFFER_TARGET = 2;
         constexpr std::size_t AUDIO_BUFFER_TARGET = 1;
+        constexpr int PSX_MOVIE_AUDIO_SAMPLE_RATE = 48000;
+
+        bool ResamplePsxMovieAudioPacket(Psx::PsxPlaybackAudioPacket* packet, std::string* error) {
+            if (packet == nullptr) {
+                if (error != nullptr) {
+                    *error = "ResamplePsxMovieAudioPacket requires a non-null packet.";
+                }
+                return false;
+            }
+
+            auto& pcm = packet->pcm;
+            if (pcm.samples.empty() || pcm.sampleFrames == 0 || pcm.channelCount == 0 || pcm.sampleRate <= 0) {
+                if (error != nullptr) {
+                    *error = "Encountered invalid PSX movie audio PCM while resampling.";
+                }
+                return false;
+            }
+
+            if (pcm.sampleRate == PSX_MOVIE_AUDIO_SAMPLE_RATE) {
+                packet->durationSeconds =
+                    static_cast<double>(pcm.sampleFrames) / static_cast<double>(pcm.sampleRate);
+                return true;
+            }
+
+            const auto inputFrames = pcm.sampleFrames;
+            const auto channelCount = static_cast<std::size_t>(pcm.channelCount);
+            const auto inputRate = static_cast<std::uint64_t>(pcm.sampleRate);
+            const auto outputRate = static_cast<std::uint64_t>(PSX_MOVIE_AUDIO_SAMPLE_RATE);
+
+            const auto outputFrames = std::max<std::size_t>(
+                1,
+                static_cast<std::size_t>(
+                    (static_cast<std::uint64_t>(inputFrames) * outputRate + inputRate / 2U) / inputRate));
+
+            std::vector<std::int16_t> resampled;
+            resampled.resize(outputFrames * channelCount);
+
+            if (inputFrames == 1) {
+                for (std::size_t frameIndex = 0; frameIndex < outputFrames; ++frameIndex) {
+                    const auto dstBase = frameIndex * channelCount;
+                    for (std::size_t channel = 0; channel < channelCount; ++channel) {
+                        resampled[dstBase + channel] = pcm.samples[channel];
+                    }
+                }
+            } else {
+                const auto sourceSpan = inputFrames - 1;
+                const auto targetSpan = outputFrames - 1;
+
+                for (std::size_t frameIndex = 0; frameIndex < outputFrames; ++frameIndex) {
+                    const std::uint64_t scaledPosition = static_cast<std::uint64_t>(frameIndex) * sourceSpan;
+                    const std::size_t baseFrame = static_cast<std::size_t>(scaledPosition / targetSpan);
+                    const std::size_t nextFrame = std::min(baseFrame + 1, sourceSpan);
+                    const double fraction = static_cast<double>(scaledPosition % targetSpan) / static_cast<double>(targetSpan);
+
+                    const auto dstBase = frameIndex * channelCount;
+                    const auto srcBase0 = baseFrame * channelCount;
+                    const auto srcBase1 = nextFrame * channelCount;
+
+                    for (std::size_t channel = 0; channel < channelCount; ++channel) {
+                        const double a = static_cast<double>(pcm.samples[srcBase0 + channel]);
+                        const double b = static_cast<double>(pcm.samples[srcBase1 + channel]);
+                        const auto value = static_cast<int>(std::lround(a + (b - a) * fraction));
+                        resampled[dstBase + channel] = static_cast<std::int16_t>(std::clamp(value, -32768, 32767));
+                    }
+                }
+            }
+
+            pcm.samples = std::move(resampled);
+            pcm.sampleRate = PSX_MOVIE_AUDIO_SAMPLE_RATE;
+            pcm.sampleFrames = outputFrames;
+            packet->durationSeconds =
+                static_cast<double>(pcm.sampleFrames) / static_cast<double>(pcm.sampleRate);
+            return true;
+        }
 
         struct PsxMovieState {
             using AudioBuffer = std::shared_ptr<std::vector<std::int16_t>>;
@@ -52,6 +128,14 @@ namespace Inferno {
             std::uint8_t AudioChannelCount = 0;
             std::size_t LoggedAudioBufferSubmissions = 0;
             bool Presenting = false;
+            int submit_count = 0;
+            int lastFrameNum_ = 0;
+
+        uint64_t GetClockTimeNs() const {
+            using namespace std::chrono;
+            auto time = (uint64_t)duration_cast<nanoseconds>(steady_clock::now().time_since_epoch()).count();
+            return time;
+        }
 
             bool SetupEmptyFrame() {
                 auto frame = Playback.PeekNextFrame();
@@ -104,6 +188,17 @@ namespace Inferno {
                     return;
                 }
 
+                #if 0
+                static uint64_t last;
+                uint64_t cur = GetClockTimeNs();
+                if (last) {
+                    printf("%f audiobuf\n", (cur - last) / 1e9);
+                }
+                last = cur;
+                #endif
+
+                if (!AudioRunning)
+                    printf("audio started\n");
                 AudioRunning = true;
 
                 const auto pendingBufferCount = static_cast<std::size_t>(std::max(Audio->GetPendingBufferCount(), 0));
@@ -136,13 +231,11 @@ namespace Inferno {
                     }
 
                     if (LoggedAudioBufferSubmissions < 8) {
-                        const double bufferDurationMs =
-                            pending.pcm.sampleRate > 0
-                                ? 1000.0 * static_cast<double>(pending.pcm.sampleFrames) / static_cast<double>(pending.pcm.sampleRate)
-                                : 0.0;
-                        SPDLOG_INFO("Queued PSX movie audio buffer #{}: {} sample frames, {} channels, {:.3f} ms, XA queue depth {} -> {}",
+                        const double bufferDurationMs = 1000.0 * pending.durationSeconds;
+                        SPDLOG_INFO("Queued PSX movie audio buffer #{}: {} sample frames @ {} Hz, {} channels, {:.3f} ms, XA queue depth {} -> {}",
                                     LoggedAudioBufferSubmissions + 1,
                                     pending.pcm.sampleFrames,
+                                    pending.pcm.sampleRate,
                                     pending.pcm.channelCount,
                                     bufferDurationMs,
                                     pendingBufferCount,
@@ -154,6 +247,7 @@ namespace Inferno {
                     Audio->SubmitBuffer(reinterpret_cast<const std::uint8_t*>(buffer->data()), byteCount);
                     LiveAudioBuffers.push_back(std::move(buffer));
                     ++pendingBufferCount;
+                    submit_count++;
                 }
 
                 if (!AudioStarted && pendingBufferCount > 0) {
@@ -177,6 +271,22 @@ namespace Inferno {
                     if (packet.pcm.samples.empty() || packet.pcm.sampleRate <= 0 || packet.pcm.channelCount == 0) {
                         continue;
                     }
+
+                    printf("orig %d hz %d samples\n", packet.pcm.sampleRate, packet.pcm.samples.size());
+
+                    std::string resampleError;
+                    if (!ResamplePsxMovieAudioPacket(&packet, &resampleError)) {
+                        SPDLOG_WARN("Unable to resample PSX movie audio packet: {}", resampleError);
+                        AudioEnabled = false;
+                        PendingAudioPackets.clear();
+                        LiveAudioBuffers.clear();
+                        if (Audio) {
+                            Audio->Stop();
+                            Audio.reset();
+                        }
+                        return;
+                    }
+                    printf("resampled to %d hz %d samples\n", packet.pcm.sampleRate, packet.pcm.samples.size());
 
                     if (!Audio) {
                         auto* engine = Sound::GetEngine();
@@ -229,6 +339,7 @@ namespace Inferno {
             }
 
             bool LoadFrame(std::string* error) {
+                static int num_frames = 0;
                 Psx::PsxPlaybackBufferedFrame buffered;
                 if (Playback.BufferedFrameCount() < VIDEO_BUFFER_TARGET) {
                     if (!Playback.FillVideoBuffer(VIDEO_BUFFER_TARGET, error)) {
@@ -251,6 +362,8 @@ namespace Inferno {
                 if (!Playback.TakeFrontVideoFrame(&buffered, error)) {
                     return false;
                 }
+
+                lastFrameNum_ = buffered.frameNumber;
 
                 DrainQueuedAudioPackets();
 
@@ -277,6 +390,13 @@ namespace Inferno {
                         0xFF000000U;
                 }
 
+                /*
+                num_frames++;
+                char buf[32];
+                snprintf(buf, sizeof(buf), "%d", num_frames);
+                SetWindowTextA(GetActiveWindow(), buf);
+                */
+
                 return true;
             }
 
@@ -295,7 +415,7 @@ namespace Inferno {
             }
 
             bool OpenMovieStream(const std::string& filename, std::string* error) {
-                const auto isoPath = D1_FOLDER / "psx.bin";
+                const auto isoPath = /*"/srv/psxout/INTRO_2352.bin";*/ D1_FOLDER / "psx.bin";
                 Image = std::make_unique<std::ifstream>(isoPath, std::ios::binary);
                 if (!*Image) {
                     if (error) *error = "Could not open PSX image: " + isoPath.string();
@@ -396,6 +516,9 @@ namespace Inferno {
     }
 
     void UpdatePsxMovie(float dt) {
+        static int updates = 0;
+        static int frames = 0;
+        static float totalTime = 0;
         auto& movie = Movie();
         if (!PsxMovieVisible) {
             return;
@@ -418,15 +541,26 @@ namespace Inferno {
             movie.Accumulator -= movie.FrameTime;
 
             std::string error;
+            frames++;
             if (!movie.LoadFrame(&error)) {
                 if (!error.empty()) {
                     SPDLOG_WARN("PSX movie playback ended or failed: {}", error);
-                    movie.Stop();
                 }
+                movie.Stop();
                 Game::SetState(GameState::LoadLevel);
                 return;
             }
+            printf("%.2f frame %d dt %.2f\n", totalTime, movie.lastFrameNum_, dt);
         }
+
+
+        updates++;
+                char buf[64];
+                snprintf(buf, sizeof(buf), "%.2f m %.2f u %.2f bv %zu ba %zu ab %d vr %.2f ar %.2f fn %d", (float)frames/updates, 1/movie.FrameTime, 1/dt,
+                    movie.Playback.BufferedFrameCount(), movie.Playback.BufferedAudioPacketsCount(),
+                    movie.Audio->GetPendingBufferCount(), frames / totalTime, movie.submit_count / totalTime,
+                    movie.lastFrameNum_);
+                SetWindowTextA(GetActiveWindow(), buf);
     }
 
     void HandlePsxMovieInput() {
