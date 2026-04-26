@@ -381,3 +381,5 @@ dxc.exe
 /d1
 /d2
 /shaders
+d[12]filter.txt
+deps/dxc

@@ -23,9 +23,10 @@
 
 namespace Inferno {
     namespace {
-        constexpr float DEFAULT_MOVIE_FRAME_TIME = 1.0f / 15.0f;
+        constexpr float DEFAULT_MOVIE_FRAME_TIME = 1.0f / 15.0f * 1001.0f / 1000.0f;
         constexpr std::size_t VIDEO_BUFFER_TARGET = 2;
-        constexpr std::size_t AUDIO_BUFFER_TARGET = 1;
+        constexpr std::size_t AUDIO_BUFFER_TARGET = 2;
+#if 0
         constexpr int PSX_MOVIE_AUDIO_SAMPLE_RATE = 48000;
 
         bool ResamplePsxMovieAudioPacket(Psx::PsxPlaybackAudioPacket* packet, std::string* error) {
@@ -100,6 +101,7 @@ namespace Inferno {
                 static_cast<double>(pcm.sampleFrames) / static_cast<double>(pcm.sampleRate);
             return true;
         }
+#endif
 
         struct PsxMovieState {
             using AudioBuffer = std::shared_ptr<std::vector<std::int16_t>>;
@@ -205,7 +207,7 @@ namespace Inferno {
                     printf("audio started\n");
                 AudioRunning = true;
 
-                const auto pendingBufferCount = static_cast<std::size_t>(std::max(GetPendingBufferCount(), 0));
+                const auto pendingBufferCount = static_cast<std::size_t>(std::max(GetAudioPendingBufferCount(), 0));
                 while (LiveAudioBuffers.size() > pendingBufferCount) {
                     LiveAudioBuffers.pop_front();
                 }
@@ -221,7 +223,7 @@ namespace Inferno {
                 // per call to this method.
                 ReleaseCompletedAudioBuffersLocked();
 
-                int pendingBufferCount = GetPendingBufferCount();
+                int pendingBufferCount = GetAudioPendingBufferCount();
 
                 while (pendingBufferCount < static_cast<int>(AUDIO_BUFFER_TARGET) && !PendingAudioPackets.empty()) {
                     auto pending = std::move(PendingAudioPackets.front());
@@ -288,7 +290,7 @@ namespace Inferno {
                 }
             }
 
-            int GetPendingBufferCount() const {
+            int GetAudioPendingBufferCount() const {
                 if (!AudioVoice) {
                     return 0;
                 }
@@ -314,6 +316,7 @@ namespace Inferno {
                         continue;
                     }
 
+                    #if 0
                     printf("orig %d hz %d samples\n", packet.pcm.sampleRate, packet.pcm.samples.size());
 
                     std::string resampleError;
@@ -331,6 +334,7 @@ namespace Inferno {
                         return;
                     }
                     printf("resampled to %d hz %d samples\n", packet.pcm.sampleRate, packet.pcm.samples.size());
+                    #endif
 
                     if (!AudioVoice) {
                         auto* engine = Sound::GetEngine();
@@ -600,16 +604,17 @@ namespace Inferno {
                 Game::SetState(GameState::LoadLevel);
                 return;
             }
-            printf("%.2f frame %d dt %.2f\n", totalTime, movie.lastFrameNum_, dt);
+            printf("%.2f frame %d dt %.3f\n", totalTime, movie.lastFrameNum_, dt);
         }
 
 
         updates++;
-                char buf[64];
-                snprintf(buf, sizeof(buf), "%.2f m %.2f u %.2f bv %zu ba %zu ab %d vr %.2f ar %.2f fn %d", (float)frames/updates, 1/movie.FrameTime, 1/dt,
+                char buf[80];
+                snprintf(buf, sizeof(buf), "%.2f m %.2f u %.2f bv %zu ba %zu ab %d vr %.2f ar %.2f fn %d ap %zu", (float)frames/updates, 1/movie.FrameTime, 1/dt,
                     movie.Playback.BufferedFrameCount(), movie.Playback.BufferedAudioPacketsCount(),
-                    movie.GetPendingBufferCount(), frames / totalTime, movie.submit_count / totalTime,
-                    movie.lastFrameNum_);
+                    movie.GetAudioPendingBufferCount(), frames / totalTime, movie.submit_count / totalTime,
+                    movie.lastFrameNum_, movie.PendingAudioPackets.size());
+                    //movie.LiveAudioBuffers.size()); //movie.Audio->GetPendingBufferCount());
                 SetWindowTextA(GetActiveWindow(), buf);
     }
 

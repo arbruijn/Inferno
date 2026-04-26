@@ -330,7 +330,7 @@ namespace Inferno::Sound {
                 _effectsD2.resize(255);
                 _listener.pCone = (X3DAUDIO_CONE*)&LISTENER_CONE;
 
-                auto flags = AudioEngine_EnvironmentalReverb | AudioEngine_ReverbUseFilters /*| AudioEngine_UseMasteringLimiter*/;
+                auto flags = AudioEngine_Default; //AudioEngine_EnvironmentalReverb | AudioEngine_ReverbUseFilters /*| AudioEngine_UseMasteringLimiter*/;
 #ifdef _DEBUG
                 flags |= AudioEngine_Debug;
 #endif
