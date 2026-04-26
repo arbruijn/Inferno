@@ -13,8 +13,6 @@
 #include "SoundCommon.h"
 #include <wrl/client.h>
 #include <unordered_map>
-extern int xaudiotest(IXAudio2 *engine);
-
 using namespace Inferno;
 using Microsoft::WRL::ComPtr;
 
@@ -596,8 +594,6 @@ HRESULT AudioEngine::Impl::Reset(const WAVEFORMATEX* wfx, const wchar_t* deviceI
         it->OnReset();
     }
 
-    xaudiotest(xaudio2.Get());
-
     return S_OK;
 }
 
@@ -869,18 +865,18 @@ void AudioEngine::Impl::AllocateVoice(
             throw std::invalid_argument("Invalid flags for one-shot voice");
         }
 
-    #ifdef VERBOSE_TRACE
+    //#ifdef VERBOSE_TRACE
         if (wfx->wFormatTag == WAVE_FORMAT_EXTENSIBLE)
         {
-            DebugTrace("INFO: Requesting one-shot: Format Tag EXTENSIBLE %u, %u channels, %u-bit, %u blkalign, %u Hz\n",
+            printf("INFO: Requesting one-shot: Format Tag EXTENSIBLE %u, %u channels, %u-bit, %u blkalign, %u Hz\n",
                 GetFormatTag(wfx), wfx->nChannels, wfx->wBitsPerSample, wfx->nBlockAlign, wfx->nSamplesPerSec);
         }
         else
         {
-            DebugTrace("INFO: Requesting one-shot: Format Tag %u, %u channels, %u-bit, %u blkalign, %u Hz\n",
+            printf("INFO: Requesting one-shot: Format Tag %u, %u channels, %u-bit, %u blkalign, %u Hz\n",
                 wfx->wFormatTag, wfx->nChannels, wfx->wBitsPerSample, wfx->nBlockAlign, wfx->nSamplesPerSec);
         }
-    #endif
+    //#endif
 
         if (!(mEngineFlags & AudioEngine_DisableVoiceReuse))
         {
@@ -950,10 +946,10 @@ void AudioEngine::Impl::AllocateVoice(
                     #endif
                     }
 
-                #ifdef VERBOSE_TRACE
-                    DebugTrace("INFO: Allocate reuse voice: Format Tag %u, %u channels, %u-bit, %u blkalign, %u Hz\n",
+                //#ifdef VERBOSE_TRACE
+                    printf("INFO: Allocate reuse voice: Format Tag %u, %u channels, %u-bit, %u blkalign, %u Hz\n",
                         wfmt->wFormatTag, wfmt->nChannels, wfmt->wBitsPerSample, wfmt->nBlockAlign, wfmt->nSamplesPerSec);
-                #endif
+                //#endif
 
                     assert(voiceKey == makeVoiceKey(wfmt));
 

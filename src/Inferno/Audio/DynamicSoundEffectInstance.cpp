@@ -10,8 +10,11 @@
 
 #include "pch.h"
 #include "SoundCommon.h"
+#include <mutex>
 
 using namespace Inferno;
+
+extern int xaudiotest(IXAudio2 *engine);
 
 
 //======================================================================================
@@ -94,6 +97,17 @@ public:
 
     void SubmitBuffer(_In_reads_bytes_(audioBytes) const uint8_t* pAudioData, uint32_t offset, size_t audioBytes);
 
+    void RunVoiceTestOnce()
+    {
+        if (mBase.engine)
+        {
+            static std::once_flag sOnceFlag;
+            std::call_once(sOnceFlag, [engine = mBase.engine]() {
+                //xaudiotest(engine->GetInterface());
+            });
+        }
+    }
+
     const WAVEFORMATEX* GetFormat() const noexcept { return &mWaveFormat; }
 
     // IVoiceNotify
@@ -144,6 +158,7 @@ private:
 void DynamicSoundEffectInstance::Impl::Play() {
     if (!mBase.voice) {
         mBase.AllocateVoice(&mWaveFormat);
+        RunVoiceTestOnce();
     }
 
     std::ignore = mBase.Play();
@@ -176,6 +191,7 @@ void DynamicSoundEffectInstance::Impl::SubmitBuffer(const uint8_t* pAudioData, u
 
     if (!mBase.voice) {
         mBase.AllocateVoice(&mWaveFormat);
+        RunVoiceTestOnce();
     }
 
     XAUDIO2_BUFFER buffer = {};

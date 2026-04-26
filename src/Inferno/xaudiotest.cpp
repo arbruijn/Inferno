@@ -70,7 +70,7 @@ struct TestCase {
 };
 
 std::vector<std::uint8_t> make_pcm_buffer(UINT32 frames, UINT32 sample_rate) {
-  constexpr UINT32 channels = 1;
+  constexpr UINT32 channels = 2;
   constexpr UINT32 bits_per_sample = 16;
   const UINT32 bytes_per_sample = bits_per_sample / 8;
   const size_t sample_count = static_cast<size_t>(frames) * channels;
@@ -136,7 +136,7 @@ void print_intervals(const TimingCallback& cb, LARGE_INTEGER freq) {
 }
 
 bool run_case(IXAudio2* engine, const TestCase& tc, LARGE_INTEGER freq) {
-  const UINT32 channels = 1;
+  const UINT32 channels = 2;
   const UINT32 bits_per_sample = 16;
   const UINT32 block_align = channels * (bits_per_sample / 8);
   const UINT32 avg_bytes_per_sec = tc.sample_rate * block_align;
@@ -254,8 +254,8 @@ int xaudiotest(IXAudio2 *engine) {
   }
 #endif  
 
-  std::array<TestCase, 9> cases = {{
-      {37800, 1024, 4},
+  std::array<TestCase, 10> cases = {{
+      {37800, 2016, 4},
       {37800, 1500, 4},
       {37800, 2048, 4},
       {44100, 1024, 4},
@@ -264,6 +264,7 @@ int xaudiotest(IXAudio2 *engine) {
       {48000, 1024, 4},
       {48000, 1500, 4},
       {48000, 2048, 4},
+      {37800, 2016, 4},
   }};
 
   bool all_ok = true;
