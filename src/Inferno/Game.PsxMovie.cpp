@@ -320,8 +320,16 @@ namespace Inferno {
                 AudioVoice->GetState(&state, 0);
 
                 std::uint64_t queuedSampleFrames = 0;
-                for (const auto& buffer : LiveAudioBuffers) {
+                /*for (const auto& buffer : LiveAudioBuffers) {
                     queuedSampleFrames += buffer.SampleFrames;
+                }*/
+                int skip = AUDIO_BUFFER_TARGET;
+                for (const auto& packet : PendingAudioPackets) {
+                    if (skip) {
+                        skip--;
+                        continue;
+                    }
+                    queuedSampleFrames += packet.pcm.sampleFrames;
                 }
 
                 const std::uint64_t playedSampleFrames = static_cast<std::uint64_t>(state.SamplesPlayed);
@@ -673,6 +681,7 @@ namespace Inferno {
                 return;
             }
             printf("%.2f frame %d dt %.3f ft %.03f\n", totalTime, movie.lastFrameNum_, dt, currentFrameTime);
+            movie.DrainQueuedAudioPackets();
         }
 
 
