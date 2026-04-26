@@ -13,6 +13,7 @@
 #include "SoundCommon.h"
 #include <wrl/client.h>
 #include <unordered_map>
+extern int xaudiotest(IXAudio2 *engine);
 
 using namespace Inferno;
 using Microsoft::WRL::ComPtr;
@@ -594,6 +595,8 @@ HRESULT AudioEngine::Impl::Reset(const WAVEFORMATEX* wfx, const wchar_t* deviceI
         assert(it != nullptr);
         it->OnReset();
     }
+
+    xaudiotest(xaudio2.Get());
 
     return S_OK;
 }
