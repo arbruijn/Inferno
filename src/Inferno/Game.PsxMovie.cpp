@@ -99,6 +99,11 @@ namespace Inferno {
                 AudioEnabled = true;
             }
 
+            void ClearQueuedAudioState() {
+                std::scoped_lock lock(AudioMutex);
+                ClearQueuedAudioStateLocked();
+            }
+
             void ClearQueuedAudioStateLocked() {
                 PendingAudioPackets.clear();
                 LiveAudioBuffers.clear();
@@ -149,8 +154,7 @@ namespace Inferno {
                     DestroyAudioVoice(voiceToDestroy);
                 }
 
-                std::scoped_lock lock(AudioMutex);
-                ClearQueuedAudioStateLocked();
+                ClearQueuedAudioState();
             }
 
             void ReleaseCompletedAudioBuffers() {
@@ -302,17 +306,53 @@ namespace Inferno {
                 return AdaptiveFrameTime;
             }
 
+            bool CreateAudioVoice() {
+                auto* engine = Sound::GetEngine();
+                if (engine == nullptr || engine->GetInterface() == nullptr) {
+                    return false;
+                }
+
+                WAVEFORMATEX format{};
+                format.wFormatTag = WAVE_FORMAT_PCM;
+                format.nChannels = AudioChannelCount;
+                format.nSamplesPerSec = AudioSampleRate;
+                format.wBitsPerSample = 16;
+                format.nBlockAlign = static_cast<WORD>(format.nChannels * (format.wBitsPerSample / 8));
+                format.nAvgBytesPerSec = format.nSamplesPerSec * format.nBlockAlign;
+
+                try {
+                    AudioVoice = std::make_unique<DynamicSoundEffectInstance>(engine, nullptr, format.nSamplesPerSec, format.nChannels, format.wBitsPerSample);
+                } catch (const std::exception& ex) {
+                    SPDLOG_WARN("Unable to start PSX movie audio playback: AllocateVoice failed: {}", ex.what());
+                    return false;
+                }
+
+                if (!AudioVoice) {
+                    SPDLOG_WARN("Unable to start PSX movie audio playback: DynamicSoundEffectInstance returned no voice");
+                    return false;
+                }
+                return true;
+            }
+
             void DrainQueuedAudioPackets() {
                 auto packets = Playback.TakeQueuedAudioPackets();
                 if (packets.empty()) {
-                    if (AudioVoice) {
-                        RefillAudioBuffers();
-                    }
+                    RefillAudioBuffers();
                     return;
                 }
 
                 if (!AudioEnabled) {
                     return;
+                }
+
+                if (!packets.empty() && !AudioVoice) {
+                    AudioSampleRate = packets[0].pcm.sampleRate;
+                    AudioChannelCount = packets[0].pcm.channelCount;
+                    if (!CreateAudioVoice()) {
+                        AudioEnabled = false;
+                        ClearQueuedAudioState();
+                        return;
+                    }
                 }
 
                 std::unique_ptr<DynamicSoundEffectInstance> voiceToDestroy;
@@ -323,46 +363,10 @@ namespace Inferno {
                             continue;
                         }
 
-                        if (!AudioVoice) {
-                            auto* engine = Sound::GetEngine();
-                            if (engine == nullptr || engine->GetInterface() == nullptr) {
-                                AudioEnabled = false;
-                                return;
-                            }
-
-                            AudioSampleRate = packet.pcm.sampleRate;
-                            AudioChannelCount = packet.pcm.channelCount;
-                            WAVEFORMATEX format{};
-                            format.wFormatTag = WAVE_FORMAT_PCM;
-                            format.nChannels = AudioChannelCount;
-                            format.nSamplesPerSec = AudioSampleRate;
-                            format.wBitsPerSample = 16;
-                            format.nBlockAlign = static_cast<WORD>(format.nChannels * (format.wBitsPerSample / 8));
-                            format.nAvgBytesPerSec = format.nSamplesPerSec * format.nBlockAlign;
-
-                            try {
-                                AudioVoice = std::make_unique<DynamicSoundEffectInstance>(engine, nullptr, format.nSamplesPerSec, format.nChannels, format.wBitsPerSample);
-                            } catch (const std::exception& ex) {
-                                SPDLOG_WARN("Unable to start PSX movie audio playback: AllocateVoice failed: {}", ex.what());
-                                AudioEnabled = false;
-                                ClearQueuedAudioStateLocked();
-                                return;
-                            }
-
-                            if (!AudioVoice) {
-                                SPDLOG_WARN("Unable to start PSX movie audio playback: DynamicSoundEffectInstance returned no voice");
-                                AudioEnabled = false;
-                                ClearQueuedAudioStateLocked();
-                                return;
-                            }
-                        }
-
                         if (packet.pcm.sampleRate != AudioSampleRate || packet.pcm.channelCount != AudioChannelCount) {
                             SPDLOG_WARN("PSX movie audio format changed during playback; disabling audio.");
                             AudioEnabled = false;
                             voiceToDestroy = std::move(AudioVoice);
-                            AudioStarted = false;
-                            AudioRunning = false;
                             break;
                         }
 
@@ -378,8 +382,7 @@ namespace Inferno {
 
                 if (voiceToDestroy) {
                     DestroyAudioVoice(voiceToDestroy);
-                    std::scoped_lock lock(AudioMutex);
-                    ClearQueuedAudioStateLocked();
+                    ClearQueuedAudioState();
                 }
             }
 
