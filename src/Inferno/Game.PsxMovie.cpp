@@ -594,9 +594,10 @@ namespace Inferno {
             }
             return movie.FrameTime;
         };
+        float currentFrameTime = GetEffectiveFrameTime();
 
         // wait until frametimes are stable
-        if (!movie.Presenting && dt > GetEffectiveFrameTime()) {
+        if (!movie.Presenting && dt > currentFrameTime) {
             return;
         }
 
@@ -606,8 +607,8 @@ namespace Inferno {
             movie.Accumulator += dt;
             totalTime += dt;
         }
-        while (movie.Accumulator >= GetEffectiveFrameTime()) {
-            movie.Accumulator -= GetEffectiveFrameTime();
+        while (movie.Accumulator >= currentFrameTime) {
+            movie.Accumulator -= currentFrameTime;
 
             std::string error;
             frames++;
@@ -619,7 +620,7 @@ namespace Inferno {
                 Game::SetState(GameState::LoadLevel);
                 return;
             }
-            printf("%.2f frame %d dt %.3f\n", totalTime, movie.lastFrameNum_, dt);
+            printf("%.2f frame %d dt %.3f ft %.03f\n", totalTime, movie.lastFrameNum_, dt, currentFrameTime);
         }
 
 
