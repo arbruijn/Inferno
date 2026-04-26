@@ -104,7 +104,10 @@ namespace Inferno {
 #endif
 
         struct PsxMovieState {
-            using AudioBuffer = std::shared_ptr<std::vector<std::int16_t>>;
+            struct AudioBuffer {
+                std::shared_ptr<std::vector<std::int16_t>> Samples;
+                std::uint64_t SampleFrames = 0;
+            };
 
             Psx::PsxIso9660Reader Iso;
             std::unique_ptr<std::ifstream> Image;
@@ -129,6 +132,7 @@ namespace Inferno {
             int AudioSampleRate = 0;
             std::uint8_t AudioChannelCount = 0;
             std::size_t LoggedAudioBufferSubmissions = 0;
+            std::uint64_t CompletedAudioSampleFrames = 0;
             bool Presenting = false;
             int submit_count = 0;
             int lastFrameNum_ = 0;
@@ -170,6 +174,12 @@ namespace Inferno {
                 AudioEnabled = true;
             }
 
+            void ClearQueuedAudioStateLocked() {
+                PendingAudioPackets.clear();
+                LiveAudioBuffers.clear();
+                CompletedAudioSampleFrames = 0;
+            }
+
             void StopAudio() {
                 std::scoped_lock lock(AudioMutex);
                 if (AudioVoice) {
@@ -178,8 +188,7 @@ namespace Inferno {
                     AudioVoice->DestroyVoice();
                     AudioVoice = nullptr;
                 }
-                PendingAudioPackets.clear();
-                LiveAudioBuffers.clear();
+                ClearQueuedAudioStateLocked();
                 AudioStarted = false;
                 AudioRunning = false;
                 AudioSampleRate = 0;
@@ -209,6 +218,7 @@ namespace Inferno {
 
                 const auto pendingBufferCount = static_cast<std::size_t>(std::max(GetAudioPendingBufferCount(), 0));
                 while (LiveAudioBuffers.size() > pendingBufferCount) {
+                    CompletedAudioSampleFrames += LiveAudioBuffers.front().SampleFrames;
                     LiveAudioBuffers.pop_front();
                 }
             }
@@ -229,8 +239,8 @@ namespace Inferno {
                     auto pending = std::move(PendingAudioPackets.front());
                     PendingAudioPackets.pop_front();
 
-                    auto buffer = std::make_shared<std::vector<std::int16_t>>(std::move(pending.pcm.samples));
-                    if (buffer->empty()) {
+                    auto samples = std::make_shared<std::vector<std::int16_t>>(std::move(pending.pcm.samples));
+                    if (samples->empty()) {
                         continue;
                     }
 
@@ -247,17 +257,16 @@ namespace Inferno {
                         ++LoggedAudioBufferSubmissions;
                     }
 
-                    const auto byteCount = buffer->size() * sizeof((*buffer)[0]);
+                    const auto byteCount = samples->size() * sizeof((*samples)[0]);
                     XAUDIO2_BUFFER xaBuffer{};
                     xaBuffer.AudioBytes = static_cast<UINT32>(byteCount);
-                    xaBuffer.pAudioData = reinterpret_cast<const BYTE*>(buffer->data());
+                    xaBuffer.pAudioData = reinterpret_cast<const BYTE*>(samples->data());
 
                     HRESULT hr = AudioVoice->SubmitSourceBuffer(&xaBuffer, nullptr);
                     if (FAILED(hr)) {
                         SPDLOG_WARN("Unable to submit PSX movie audio buffer to XAudio2.");
                         AudioEnabled = false;
-                        PendingAudioPackets.clear();
-                        LiveAudioBuffers.clear();
+                        ClearQueuedAudioStateLocked();
                         std::ignore = AudioVoice->Stop(0);
                         std::ignore = AudioVoice->FlushSourceBuffers();
                         AudioVoice->DestroyVoice();
@@ -266,7 +275,10 @@ namespace Inferno {
                         AudioRunning = false;
                         return;
                     }
-                    LiveAudioBuffers.push_back(std::move(buffer));
+                    AudioBuffer liveBuffer;
+                    liveBuffer.Samples = std::move(samples);
+                    liveBuffer.SampleFrames = pending.pcm.sampleFrames;
+                    LiveAudioBuffers.push_back(std::move(liveBuffer));
                     ++pendingBufferCount;
                     submit_count++;
                 }
@@ -276,8 +288,7 @@ namespace Inferno {
                     if (FAILED(hr)) {
                         SPDLOG_WARN("Unable to start PSX movie audio playback.");
                         AudioEnabled = false;
-                        PendingAudioPackets.clear();
-                        LiveAudioBuffers.clear();
+                        ClearQueuedAudioStateLocked();
                         std::ignore = AudioVoice->Stop(0);
                         std::ignore = AudioVoice->FlushSourceBuffers();
                         AudioVoice->DestroyVoice();
@@ -300,9 +311,40 @@ namespace Inferno {
                 return static_cast<int>(state.BuffersQueued);
             }
 
+            double GetQueuedAudioDepthSecondsLocked() const {
+                if (!AudioVoice || AudioSampleRate <= 0) {
+                    return 0.0;
+                }
+
+                XAUDIO2_VOICE_STATE state{};
+                AudioVoice->GetState(&state, 0);
+
+                std::uint64_t queuedSampleFrames = 0;
+                for (const auto& buffer : LiveAudioBuffers) {
+                    queuedSampleFrames += buffer.SampleFrames;
+                }
+
+                const std::uint64_t playedSampleFrames = static_cast<std::uint64_t>(state.SamplesPlayed);
+                const std::uint64_t consumedSampleFrames =
+                    playedSampleFrames > CompletedAudioSampleFrames
+                        ? playedSampleFrames - CompletedAudioSampleFrames
+                        : 0;
+                const std::uint64_t remainingSampleFrames =
+                    queuedSampleFrames > consumedSampleFrames
+                        ? queuedSampleFrames - consumedSampleFrames
+                        : 0;
+                return static_cast<double>(remainingSampleFrames) / static_cast<double>(AudioSampleRate);
+            }
+
             std::size_t GetLiveAudioBufferCount() {
                 std::scoped_lock lock(AudioMutex);
                 return LiveAudioBuffers.size();
+            }
+
+            double GetQueuedAudioDepthSeconds() {
+                std::scoped_lock lock(AudioMutex);
+                ReleaseCompletedAudioBuffersLocked();
+                return GetQueuedAudioDepthSecondsLocked();
             }
 
             void DrainQueuedAudioPackets() {
@@ -369,8 +411,7 @@ namespace Inferno {
                         if (FAILED(hr) || !AudioVoice) {
                             SPDLOG_WARN("Unable to start PSX movie audio playback: CreateSourceVoice failed with 0x{:08X}", static_cast<unsigned int>(hr));
                             AudioEnabled = false;
-                            PendingAudioPackets.clear();
-                            LiveAudioBuffers.clear();
+                            ClearQueuedAudioStateLocked();
                             return;
                         }
                     }
@@ -378,8 +419,7 @@ namespace Inferno {
                     if (packet.pcm.sampleRate != AudioSampleRate || packet.pcm.channelCount != AudioChannelCount) {
                         SPDLOG_WARN("PSX movie audio format changed during playback; disabling audio.");
                         AudioEnabled = false;
-                        PendingAudioPackets.clear();
-                        LiveAudioBuffers.clear();
+                        ClearQueuedAudioStateLocked();
                         if (AudioVoice) {
                             std::ignore = AudioVoice->Stop(0);
                             std::ignore = AudioVoice->FlushSourceBuffers();
@@ -586,18 +626,23 @@ namespace Inferno {
         movie.DrainQueuedAudioPackets();
 
         auto GetEffectiveFrameTime = [&]() {
-            const std::size_t liveAudioBufferCount = movie.GetLiveAudioBufferCount();
-            if (liveAudioBufferCount > AUDIO_BUFFER_TARGET) {
-                return movie.FrameTime *
-                    static_cast<float>(liveAudioBufferCount) /
-                    static_cast<float>(AUDIO_BUFFER_TARGET);
+            const float nominalFrameTime = movie.FrameTime;
+            if (!movie.AudioRunning || nominalFrameTime <= 0.0f || movie.Playback.BufferedFrameCount() == 0) {
+                return nominalFrameTime;
             }
-            return movie.FrameTime;
+
+            const double queuedAudioSeconds = movie.GetQueuedAudioDepthSeconds();
+            const double targetQueuedAudioSeconds =
+                static_cast<double>(movie.Playback.BufferedFrameCount() - 1) * nominalFrameTime;
+            const double correctedFrameTime =
+                std::clamp(queuedAudioSeconds - targetQueuedAudioSeconds,
+                           0.0,
+                           static_cast<double>(nominalFrameTime) * 2.0);
+            return static_cast<float>(correctedFrameTime);
         };
-        float currentFrameTime = GetEffectiveFrameTime();
 
         // wait until frametimes are stable
-        if (!movie.Presenting && dt > currentFrameTime) {
+        if (!movie.Presenting && movie.FrameTime > 0.0f && dt > movie.FrameTime) {
             return;
         }
 
@@ -607,8 +652,15 @@ namespace Inferno {
             movie.Accumulator += dt;
             totalTime += dt;
         }
-        while (movie.Accumulator >= currentFrameTime) {
-            movie.Accumulator -= currentFrameTime;
+        while (true) {
+            const float currentFrameTime = GetEffectiveFrameTime();
+            if (currentFrameTime > 0.0f && movie.Accumulator < currentFrameTime) {
+                break;
+            }
+
+            if (currentFrameTime > 0.0f) {
+                movie.Accumulator -= currentFrameTime;
+            }
 
             std::string error;
             frames++;
