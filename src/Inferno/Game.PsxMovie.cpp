@@ -1,3 +1,4 @@
+#define PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE
 #include "pch.h"
 #include "Game.PsxMovie.h"
 
@@ -231,7 +232,7 @@ namespace Inferno {
                     return;
                 }
 
-                std::ignore = voice->Stop(true);
+                voice->Stop(true);
                 voice.reset();
             }
 #endif
