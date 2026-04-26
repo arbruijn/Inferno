@@ -300,6 +300,11 @@ namespace Inferno {
                 return static_cast<int>(state.BuffersQueued);
             }
 
+            std::size_t GetLiveAudioBufferCount() {
+                std::scoped_lock lock(AudioMutex);
+                return LiveAudioBuffers.size();
+            }
+
             void DrainQueuedAudioPackets() {
                 auto packets = Playback.TakeQueuedAudioPackets();
                 if (packets.empty()) {
@@ -578,21 +583,31 @@ namespace Inferno {
             return;
         }
 
+        movie.DrainQueuedAudioPackets();
+
+        auto GetEffectiveFrameTime = [&]() {
+            const std::size_t liveAudioBufferCount = movie.GetLiveAudioBufferCount();
+            if (liveAudioBufferCount > AUDIO_BUFFER_TARGET) {
+                return movie.FrameTime *
+                    static_cast<float>(liveAudioBufferCount) /
+                    static_cast<float>(AUDIO_BUFFER_TARGET);
+            }
+            return movie.FrameTime;
+        };
+
         // wait until frametimes are stable
-        if (!movie.Presenting && dt > movie.FrameTime) {
+        if (!movie.Presenting && dt > GetEffectiveFrameTime()) {
             return;
         }
 
         movie.Presenting = true;
 
-        movie.DrainQueuedAudioPackets();
-
         if (movie.AudioRunning) {
             movie.Accumulator += dt;
             totalTime += dt;
         }
-        while (movie.Accumulator >= movie.FrameTime) {
-            movie.Accumulator -= movie.FrameTime;
+        while (movie.Accumulator >= GetEffectiveFrameTime()) {
+            movie.Accumulator -= GetEffectiveFrameTime();
 
             std::string error;
             frames++;
