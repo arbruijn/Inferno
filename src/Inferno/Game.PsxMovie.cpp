@@ -21,7 +21,6 @@
 #include "Psx/PsxPlayback.h"
 #include "SoundSystem.h"
 
-
 namespace Inferno {
     namespace {
         constexpr float DEFAULT_MOVIE_FRAME_TIME = 1.0f / 15.0f;
@@ -912,7 +911,7 @@ namespace Inferno {
 
 
         updates++;
-                char buf[80];
+                char buf[128];
                 const auto queuedAudioSamples = movie.GetQueuedAudioAccumulationSampleFrames();
                 snprintf(buf, sizeof(buf), "%.2f m %.2f u %.2f af %.2f tf %.2f bv %zu ba %zu ab %d fn %d qs %llu", (float)frames/updates, 1/movie.FrameTime, 1/dt,
                     1/movie.AdaptiveFrameTime, 1/movie.TargetFrameTime,
@@ -920,7 +919,14 @@ namespace Inferno {
                     movie.GetAudioPendingBufferCount(),
                     movie.lastFrameNum_, static_cast<unsigned long long>(queuedAudioSamples));
                     //movie.LiveAudioBuffers.size()); //movie.Audio->GetPendingBufferCount());
-                SetWindowTextA(GetActiveWindow(), buf);
+                //SetWindowTextA(GetActiveWindow(), buf);
+
+                snprintf(buf, sizeof(buf), "%.2f m %.2f u %.2f bv %zu ba %zu ab %d vr %.2f ar %.2f fn %d ap %zu", (float)frames/updates, 1/movie.FrameTime, 1/dt,
+                    movie.Playback.BufferedFrameCount(), movie.Playback.BufferedAudioPacketsCount(),
+                    movie.GetAudioPendingBufferCount(), frames / totalTime, movie.submit_count / totalTime,
+                    movie.lastFrameNum_, movie.PendingAudioPackets.size());
+                     //movie.LiveAudioBuffers.size()); //movie.Audio->GetPendingBufferCount());
+                 SetWindowTextA(GetActiveWindow(), buf);
     }
 
     void HandlePsxMovieInput() {

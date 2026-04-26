@@ -112,12 +112,14 @@ public:
 
     // IVoiceNotify
     void __cdecl OnBufferEnd() override {
+#if 0
                 static uint64_t last;
                 uint64_t cur = GetClockTimeNs();
                 if (last) {
                     printf("%f audiobuf\n", (cur - last) / 1e9);
                 }
                 last = cur;
+#endif
         SetEvent(mBufferEvent.get());
     }
 
