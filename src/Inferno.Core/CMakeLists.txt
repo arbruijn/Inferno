@@ -14,11 +14,10 @@ target_link_libraries(InfernoCore PUBLIC
     magic_enum::magic_enum
 )
 
-#if(NOT MSVC)
-## lodepng
-#target_include_directories(InfernoCore PRIVATE ${lodepng_SOURCE_DIR})
-#target_sources(InfernoCore PRIVATE ${lodepng_SOURCE_DIR}/lodepng.cpp)
-#endif()
+if(NOT MSVC)
+target_include_directories(InfernoCore PRIVATE ${lodepng_SOURCE_DIR})
+target_sources(InfernoCore PRIVATE ${lodepng_SOURCE_DIR}/lodepng.cpp)
+endif()
 
 if(LINUX)
     target_include_directories(InfernoCore SYSTEM PUBLIC
