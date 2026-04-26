@@ -144,7 +144,11 @@ namespace Inferno {
             std::vector<uint32> RgbaPixels;
             Texture2D FrameTexture;
             //AudioVoiceCallback VoiceCallback;
+#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
+            std::unique_ptr<DynamicSoundEffectInstance> AudioVoice;
+#else
             IXAudio2SourceVoice* AudioVoice = nullptr;
+#endif
             std::deque<Psx::PsxPlaybackAudioPacket> PendingAudioPackets;
             // Keep submitted PCM alive until XAudio2 signals that each buffer finished.
             std::deque<AudioBuffer> LiveAudioBuffers;
@@ -221,12 +225,31 @@ namespace Inferno {
                 }
             }
 
+#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
+            void DestroyAudioVoice(std::unique_ptr<DynamicSoundEffectInstance>& voice) {
+                if (!voice) {
+                    return;
+                }
+
+                std::ignore = voice->Stop(true);
+                voice.reset();
+            }
+#endif
+
             void StopAudio() {
+            #if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
+                std::unique_ptr<DynamicSoundEffectInstance> voiceToDestroy;
+            #else
                 IXAudio2SourceVoice* voiceToDestroy = nullptr;
+            #endif
                 {
                     std::scoped_lock lock(AudioMutex);
+#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
+                    voiceToDestroy = std::move(AudioVoice);
+#else
                     voiceToDestroy = AudioVoice;
                     AudioVoice = nullptr;
+#endif
                     AudioStarted = false;
                     AudioRunning = false;
                     AudioSampleRate = 0;
@@ -237,9 +260,13 @@ namespace Inferno {
                 }
 
                 if (voiceToDestroy) {
+#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
+                    DestroyAudioVoice(voiceToDestroy);
+#else
                     std::ignore = voiceToDestroy->Stop(0);
                     std::ignore = voiceToDestroy->FlushSourceBuffers();
                     DestroyAudioVoice(voiceToDestroy);
+#endif
                 }
 
                 std::scoped_lock lock(AudioMutex);
@@ -316,6 +343,18 @@ namespace Inferno {
                     }
 
                     const auto byteCount = samples->size() * sizeof((*samples)[0]);
+#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
+                    try {
+                        AudioVoice->SubmitBuffer(reinterpret_cast<const uint8_t*>(samples->data()), byteCount);
+                    } catch (const std::exception& ex) {
+                        SPDLOG_WARN("Unable to submit PSX movie audio buffer: {}", ex.what());
+                        AudioEnabled = false;
+                        AudioVoice.reset();
+                        AudioStarted = false;
+                        AudioRunning = false;
+                        return false;
+                    }
+#else
                     XAUDIO2_BUFFER xaBuffer{};
                     xaBuffer.AudioBytes = static_cast<UINT32>(byteCount);
                     xaBuffer.pAudioData = reinterpret_cast<const BYTE*>(samples->data());
@@ -329,6 +368,7 @@ namespace Inferno {
                         AudioRunning = false;
                         return false;
                     }
+#endif
                     AudioBuffer liveBuffer;
                     liveBuffer.Samples = std::move(samples);
                     liveBuffer.SampleFrames = pending.pcm.sampleFrames;
@@ -338,6 +378,18 @@ namespace Inferno {
                 }
 
                 if (!AudioStarted && pendingBufferCount > 0) {
+#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
+                    try {
+                        AudioVoice->Play();
+                    } catch (const std::exception& ex) {
+                        SPDLOG_WARN("Unable to start PSX movie audio playback: {}", ex.what());
+                        AudioEnabled = false;
+                        AudioVoice.reset();
+                        AudioStarted = false;
+                        AudioRunning = false;
+                        return false;
+                    }
+#else
                     HRESULT hr = AudioVoice->Start(0);
                     if (FAILED(hr)) {
                         SPDLOG_WARN("Unable to start PSX movie audio playback.");
@@ -347,6 +399,7 @@ namespace Inferno {
                         AudioRunning = false;
                         return false;
                     }
+#endif
                     AudioStarted = true;
                 }
 
@@ -358,18 +411,19 @@ namespace Inferno {
                     return 0;
                 }
 
+#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
+                return AudioVoice->GetPendingBufferCount();
+#else
                 XAUDIO2_VOICE_STATE state{};
                 AudioVoice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
                 return static_cast<int>(state.BuffersQueued);
+#endif
             }
 
             double GetQueuedAudioDepthSecondsLocked() const {
                 if (!AudioVoice || AudioSampleRate <= 0) {
                     return 0.0;
                 }
-
-                XAUDIO2_VOICE_STATE state{};
-                AudioVoice->GetState(&state, 0);
 
                 std::uint64_t queuedSampleFrames = 0;
                 int skip = 1;
@@ -389,6 +443,11 @@ namespace Inferno {
                     queuedSampleFrames += packet.pcm.sampleFrames;
                 }
 
+#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
+                return static_cast<double>(queuedSampleFrames) / static_cast<double>(AudioSampleRate);
+#else
+                XAUDIO2_VOICE_STATE state{};
+                AudioVoice->GetState(&state, 0);
                 const std::uint64_t playedSampleFrames = static_cast<std::uint64_t>(state.SamplesPlayed);
                 const std::uint64_t consumedSampleFrames =
                     playedSampleFrames > CompletedAudioSampleFrames
@@ -399,6 +458,7 @@ namespace Inferno {
                         ? queuedSampleFrames - consumedSampleFrames
                         : 0;
                 return static_cast<double>(remainingSampleFrames) / static_cast<double>(AudioSampleRate);
+#endif
             }
 
             std::size_t GetLiveAudioBufferCount() {
@@ -425,7 +485,11 @@ namespace Inferno {
                     return;
                 }
 
+            #if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
+                std::unique_ptr<DynamicSoundEffectInstance> voiceToDestroy;
+            #else
                 IXAudio2SourceVoice* voiceToDestroy = nullptr;
+            #endif
                 {
                     std::scoped_lock lock(AudioMutex);
                     for (auto& packet : packets) {
@@ -471,7 +535,11 @@ namespace Inferno {
                             format.nAvgBytesPerSec = format.nSamplesPerSec * format.nBlockAlign;
 
                             try {
+#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
+                                AudioVoice = std::make_unique<DynamicSoundEffectInstance>(engine, nullptr, format.nSamplesPerSec, format.nChannels, format.wBitsPerSample);
+#else
                                 engine->AllocateVoice(&format, SoundEffectInstance_Default, false, &AudioVoice);
+#endif
                             } catch (const std::exception& ex) {
                                 SPDLOG_WARN("Unable to start PSX movie audio playback: AllocateVoice failed: {}", ex.what());
                                 AudioEnabled = false;
@@ -480,7 +548,11 @@ namespace Inferno {
                             }
 
                             if (!AudioVoice) {
+#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
+                                SPDLOG_WARN("Unable to start PSX movie audio playback: DynamicSoundEffectInstance returned no voice");
+#else
                                 SPDLOG_WARN("Unable to start PSX movie audio playback: AllocateVoice returned no voice");
+#endif
                                 AudioEnabled = false;
                                 ClearQueuedAudioStateLocked();
                                 return;
@@ -490,8 +562,12 @@ namespace Inferno {
                         if (packet.pcm.sampleRate != AudioSampleRate || packet.pcm.channelCount != AudioChannelCount) {
                             SPDLOG_WARN("PSX movie audio format changed during playback; disabling audio.");
                             AudioEnabled = false;
+#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
+                            voiceToDestroy = std::move(AudioVoice);
+#else
                             voiceToDestroy = AudioVoice;
                             AudioVoice = nullptr;
+#endif
                             AudioStarted = false;
                             AudioRunning = false;
                             break;
@@ -501,17 +577,29 @@ namespace Inferno {
                     }
 
                     if (!voiceToDestroy && AudioVoice) {
+#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
+                        auto* refillVoice = AudioVoice.get();
+#else
                         auto* refillVoice = AudioVoice;
+#endif
                         if (!RefillAudioBuffersLocked()) {
+#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
+                            voiceToDestroy = std::move(AudioVoice);
+#else
                             voiceToDestroy = refillVoice;
+#endif
                         }
                     }
                 }
 
                 if (voiceToDestroy) {
+#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
+                    DestroyAudioVoice(voiceToDestroy);
+#else
                     std::ignore = voiceToDestroy->Stop(0);
                     std::ignore = voiceToDestroy->FlushSourceBuffers();
                     DestroyAudioVoice(voiceToDestroy);
+#endif
                     std::scoped_lock lock(AudioMutex);
                     ClearQueuedAudioStateLocked();
                 }
