@@ -23,8 +23,8 @@
 namespace Inferno {
     namespace {
         constexpr float DEFAULT_MOVIE_FRAME_TIME = 1.0f / 15.0f;
-        constexpr std::size_t VIDEO_BUFFER_TARGET = 2;
-        constexpr std::size_t AUDIO_BUFFER_TARGET = 2;
+        constexpr std::size_t VIDEO_BUFFER_TARGET = 3;
+        constexpr std::size_t AUDIO_BUFFER_TARGET = 3;
         constexpr float MIN_ADAPTIVE_FRAME_TIME_SCALE = 1.0f;
         constexpr float MAX_ADAPTIVE_FRAME_TIME_SCALE = 1.5f;
         constexpr int AUDIO_QUEUE_CLEAR_FRAMES_BEFORE_PROBE = 8;
@@ -63,14 +63,8 @@ namespace Inferno {
             std::uint64_t QueuedAudioAccumulationSampleFrames = 0;
             int ConsecutiveAudioQueueClearFrames = 0;
             bool Presenting = false;
-
-            //PsxMovieState() : VoiceCallback(this) {}
-
-        uint64_t GetClockTimeNs() const {
-            using namespace std::chrono;
-            auto time = (uint64_t)duration_cast<nanoseconds>(steady_clock::now().time_since_epoch()).count();
-            return time;
-        }
+            int lastFrameNum_ = 0;
+            int submit_count = 0;
 
             bool SetupEmptyFrame() {
                 auto frame = Playback.PeekNextFrame();
@@ -618,7 +612,7 @@ namespace Inferno {
                     //movie.LiveAudioBuffers.size()); //movie.Audio->GetPendingBufferCount());
                 //SetWindowTextA(GetActiveWindow(), buf);
 
-                snprintf(buf, sizeof(buf), "%.2f m %.2f u %.2f bv %zu ba %zu ab %d vr %.2f ar %.2f fn %d ap %zu", (float)frames/updates, 1/movie.FrameTime, 1/dt,
+                snprintf(buf, sizeof(buf), "%.2f m %.2f u %.0f bv %zu ba %zu ab %d vr %.2f ar %.2f fn %d ap %zu", (float)frames/updates, 1/movie.FrameTime, 1/dt,
                     movie.Playback.BufferedFrameCount(), movie.Playback.BufferedAudioPacketsCount(),
                     movie.GetAudioPendingBufferCount(), frames / totalTime, movie.submit_count / totalTime,
                     movie.lastFrameNum_, movie.PendingAudioPackets.size());
