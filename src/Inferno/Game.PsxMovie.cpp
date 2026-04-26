@@ -1,4 +1,3 @@
-#define PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE
 #include "pch.h"
 #include "Game.PsxMovie.h"
 
@@ -29,110 +28,8 @@ namespace Inferno {
         constexpr float MIN_ADAPTIVE_FRAME_TIME_SCALE = 1.0f;
         constexpr float MAX_ADAPTIVE_FRAME_TIME_SCALE = 1.5f;
         constexpr int AUDIO_QUEUE_CLEAR_FRAMES_BEFORE_PROBE = 8;
-#if 0
-        constexpr int PSX_MOVIE_AUDIO_SAMPLE_RATE = 48000;
-
-        bool ResamplePsxMovieAudioPacket(Psx::PsxPlaybackAudioPacket* packet, std::string* error) {
-            if (packet == nullptr) {
-                if (error != nullptr) {
-                    *error = "ResamplePsxMovieAudioPacket requires a non-null packet.";
-                }
-                return false;
-            }
-
-            auto& pcm = packet->pcm;
-            if (pcm.samples.empty() || pcm.sampleFrames == 0 || pcm.channelCount == 0 || pcm.sampleRate <= 0) {
-                if (error != nullptr) {
-                    *error = "Encountered invalid PSX movie audio PCM while resampling.";
-                }
-                return false;
-            }
-
-            if (pcm.sampleRate == PSX_MOVIE_AUDIO_SAMPLE_RATE) {
-                packet->durationSeconds =
-                    static_cast<double>(pcm.sampleFrames) / static_cast<double>(pcm.sampleRate);
-                return true;
-            }
-
-            const auto inputFrames = pcm.sampleFrames;
-            const auto channelCount = static_cast<std::size_t>(pcm.channelCount);
-            const auto inputRate = static_cast<std::uint64_t>(pcm.sampleRate);
-            const auto outputRate = static_cast<std::uint64_t>(PSX_MOVIE_AUDIO_SAMPLE_RATE);
-
-            const auto outputFrames = std::max<std::size_t>(
-                1,
-                static_cast<std::size_t>(
-                    (static_cast<std::uint64_t>(inputFrames) * outputRate + inputRate / 2U) / inputRate));
-
-            std::vector<std::int16_t> resampled;
-            resampled.resize(outputFrames * channelCount);
-
-            if (inputFrames == 1) {
-                for (std::size_t frameIndex = 0; frameIndex < outputFrames; ++frameIndex) {
-                    const auto dstBase = frameIndex * channelCount;
-                    for (std::size_t channel = 0; channel < channelCount; ++channel) {
-                        resampled[dstBase + channel] = pcm.samples[channel];
-                    }
-                }
-            } else {
-                const auto sourceSpan = inputFrames - 1;
-                const auto targetSpan = outputFrames - 1;
-
-                for (std::size_t frameIndex = 0; frameIndex < outputFrames; ++frameIndex) {
-                    const std::uint64_t scaledPosition = static_cast<std::uint64_t>(frameIndex) * sourceSpan;
-                    const std::size_t baseFrame = static_cast<std::size_t>(scaledPosition / targetSpan);
-                    const std::size_t nextFrame = std::min(baseFrame + 1, sourceSpan);
-                    const double fraction = static_cast<double>(scaledPosition % targetSpan) / static_cast<double>(targetSpan);
-
-                    const auto dstBase = frameIndex * channelCount;
-                    const auto srcBase0 = baseFrame * channelCount;
-                    const auto srcBase1 = nextFrame * channelCount;
-
-                    for (std::size_t channel = 0; channel < channelCount; ++channel) {
-                        const double a = static_cast<double>(pcm.samples[srcBase0 + channel]);
-                        const double b = static_cast<double>(pcm.samples[srcBase1 + channel]);
-                        const auto value = static_cast<int>(std::lround(a + (b - a) * fraction));
-                        resampled[dstBase + channel] = static_cast<std::int16_t>(std::clamp(value, -32768, 32767));
-                    }
-                }
-            }
-
-            pcm.samples = std::move(resampled);
-            pcm.sampleRate = PSX_MOVIE_AUDIO_SAMPLE_RATE;
-            pcm.sampleFrames = outputFrames;
-            packet->durationSeconds =
-                static_cast<double>(pcm.sampleFrames) / static_cast<double>(pcm.sampleRate);
-            return true;
-        }
-#endif
 
         struct PsxMovieState {
-/*
-            struct AudioVoiceCallback final : IXAudio2VoiceCallback {
-                PsxMovieState* State = nullptr;
-
-                explicit AudioVoiceCallback(PsxMovieState* state = nullptr)
-                    : State(state) {}
-
-                void OnVoiceProcessingPassStart(UINT32) override {}
-                void OnVoiceProcessingPassEnd() override {}
-                void OnStreamEnd() override {}
-                void OnBufferStart(void*) override {}
-
-                void OnBufferEnd(void*) override {
-                    if (!State) {
-                        return;
-                    }
-
-                    std::scoped_lock lock(State->AudioMutex);
-                    //State->ReleaseCompletedAudioBuffersLocked();
-                }
-
-                void OnLoopEnd(void*) override {}
-                void OnVoiceError(void*, HRESULT) override {}
-            };
-*/
-
             struct AudioBuffer {
                 std::shared_ptr<std::vector<std::int16_t>> Samples;
                 std::uint64_t SampleFrames = 0;
@@ -146,14 +43,8 @@ namespace Inferno {
             Psx::PsxRgbFrame CurrentFrame;
             std::vector<uint32> RgbaPixels;
             Texture2D FrameTexture;
-            //AudioVoiceCallback VoiceCallback;
-#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
             std::unique_ptr<DynamicSoundEffectInstance> AudioVoice;
-#else
-            IXAudio2SourceVoice* AudioVoice = nullptr;
-#endif
             std::deque<Psx::PsxPlaybackAudioPacket> PendingAudioPackets;
-            // Keep submitted PCM alive until XAudio2 signals that each buffer finished.
             std::deque<AudioBuffer> LiveAudioBuffers;
             std::mutex AudioMutex;
             float FrameTime = DEFAULT_MOVIE_FRAME_TIME;
@@ -172,8 +63,6 @@ namespace Inferno {
             std::uint64_t QueuedAudioAccumulationSampleFrames = 0;
             int ConsecutiveAudioQueueClearFrames = 0;
             bool Presenting = false;
-            int submit_count = 0;
-            int lastFrameNum_ = 0;
 
             //PsxMovieState() : VoiceCallback(this) {}
 
@@ -219,7 +108,6 @@ namespace Inferno {
             void ClearQueuedAudioStateLocked() {
                 PendingAudioPackets.clear();
                 LiveAudioBuffers.clear();
-                CompletedAudioSampleFrames = 0;
                 QueuedAudioAccumulationSampleFrames = 0;
                 ConsecutiveAudioQueueClearFrames = 0;
             }
@@ -240,19 +128,6 @@ namespace Inferno {
                                                FrameTime * MAX_ADAPTIVE_FRAME_TIME_SCALE);
             }
 
-            void DestroyAudioVoice(IXAudio2SourceVoice* voice) {
-                if (!voice) {
-                    return;
-                }
-
-                if (auto* engine = Sound::GetEngine()) {
-                    engine->DestroyVoice(voice);
-                } else {
-                    voice->DestroyVoice();
-                }
-            }
-
-#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
             void DestroyAudioVoice(std::unique_ptr<DynamicSoundEffectInstance>& voice) {
                 if (!voice) {
                     return;
@@ -261,22 +136,12 @@ namespace Inferno {
                 voice->Stop(true);
                 voice.reset();
             }
-#endif
 
             void StopAudio() {
-            #if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
                 std::unique_ptr<DynamicSoundEffectInstance> voiceToDestroy;
-            #else
-                IXAudio2SourceVoice* voiceToDestroy = nullptr;
-            #endif
                 {
                     std::scoped_lock lock(AudioMutex);
-#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
                     voiceToDestroy = std::move(AudioVoice);
-#else
-                    voiceToDestroy = AudioVoice;
-                    AudioVoice = nullptr;
-#endif
                     AudioStarted = false;
                     AudioRunning = false;
                     AudioSampleRate = 0;
@@ -287,13 +152,7 @@ namespace Inferno {
                 }
 
                 if (voiceToDestroy) {
-#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
                     DestroyAudioVoice(voiceToDestroy);
-#else
-                    std::ignore = voiceToDestroy->Stop(0);
-                    std::ignore = voiceToDestroy->FlushSourceBuffers();
-                    DestroyAudioVoice(voiceToDestroy);
-#endif
                 }
 
                 std::scoped_lock lock(AudioMutex);
@@ -309,23 +168,10 @@ namespace Inferno {
                 if (!AudioVoice) {
                     return;
                 }
-
-                #if 0
-                static uint64_t last;
-                uint64_t cur = GetClockTimeNs();
-                if (last) {
-                    printf("%f audiobuf\n", (cur - last) / 1e9);
-                }
-                last = cur;
-                #endif
-
-                if (!AudioRunning)
-                    printf("audio started\n");
                 AudioRunning = true;
 
                 const auto pendingBufferCount = static_cast<std::size_t>(std::max(GetAudioPendingBufferCount(), 0));
                 while (LiveAudioBuffers.size() > pendingBufferCount) {
-                    CompletedAudioSampleFrames += LiveAudioBuffers.front().SampleFrames;
                     LiveAudioBuffers.pop_front();
                 }
             }
@@ -340,9 +186,6 @@ namespace Inferno {
                     return true;
                 }
 
-                // Retire submitted PCM by comparing it with XAudio2's actual
-                // queued buffer count instead of assuming one buffer completed
-                // per call to this method.
                 ReleaseCompletedAudioBuffersLocked();
 
                 int pendingBufferCount = GetAudioPendingBufferCount();
@@ -370,7 +213,6 @@ namespace Inferno {
                     }
 
                     const auto byteCount = samples->size() * sizeof((*samples)[0]);
-#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
                     try {
                         AudioVoice->SubmitBuffer(reinterpret_cast<const uint8_t*>(samples->data()), byteCount);
                     } catch (const std::exception& ex) {
@@ -381,31 +223,14 @@ namespace Inferno {
                         AudioRunning = false;
                         return false;
                     }
-#else
-                    XAUDIO2_BUFFER xaBuffer{};
-                    xaBuffer.AudioBytes = static_cast<UINT32>(byteCount);
-                    xaBuffer.pAudioData = reinterpret_cast<const BYTE*>(samples->data());
-
-                    HRESULT hr = AudioVoice->SubmitSourceBuffer(&xaBuffer, nullptr);
-                    if (FAILED(hr)) {
-                        SPDLOG_WARN("Unable to submit PSX movie audio buffer to XAudio2.");
-                        AudioEnabled = false;
-                        AudioVoice = nullptr;
-                        AudioStarted = false;
-                        AudioRunning = false;
-                        return false;
-                    }
-#endif
                     AudioBuffer liveBuffer;
                     liveBuffer.Samples = std::move(samples);
                     liveBuffer.SampleFrames = pending.pcm.sampleFrames;
                     LiveAudioBuffers.push_back(std::move(liveBuffer));
                     ++pendingBufferCount;
-                    submit_count++;
                 }
 
                 if (!AudioStarted && pendingBufferCount > 0) {
-#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
                     try {
                         AudioVoice->Play();
                     } catch (const std::exception& ex) {
@@ -416,17 +241,6 @@ namespace Inferno {
                         AudioRunning = false;
                         return false;
                     }
-#else
-                    HRESULT hr = AudioVoice->Start(0);
-                    if (FAILED(hr)) {
-                        SPDLOG_WARN("Unable to start PSX movie audio playback.");
-                        AudioEnabled = false;
-                        AudioVoice = nullptr;
-                        AudioStarted = false;
-                        AudioRunning = false;
-                        return false;
-                    }
-#endif
                     AudioStarted = true;
                 }
 
@@ -438,54 +252,7 @@ namespace Inferno {
                     return 0;
                 }
 
-#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
                 return AudioVoice->GetPendingBufferCount();
-#else
-                XAUDIO2_VOICE_STATE state{};
-                AudioVoice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
-                return static_cast<int>(state.BuffersQueued);
-#endif
-            }
-
-            double GetQueuedAudioDepthSecondsLocked() const {
-                if (!AudioVoice || AudioSampleRate <= 0) {
-                    return 0.0;
-                }
-
-                std::uint64_t queuedSampleFrames = 0;
-                int skip = AUDIO_BUFFER_TARGET;
-                for (const auto& buffer : LiveAudioBuffers) {
-                    if (skip) {
-                        skip--;
-                        continue;
-                    }
-                    queuedSampleFrames += buffer.SampleFrames;
-                }
-                skip = 0; //AUDIO_BUFFER_TARGET;
-                for (const auto& packet : PendingAudioPackets) {
-                    if (skip) {
-                        skip--;
-                        continue;
-                    }
-                    queuedSampleFrames += packet.pcm.sampleFrames;
-                }
-
-#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
-                return static_cast<double>(queuedSampleFrames) / static_cast<double>(AudioSampleRate);
-#else
-                XAUDIO2_VOICE_STATE state{};
-                AudioVoice->GetState(&state, 0);
-                const std::uint64_t playedSampleFrames = static_cast<std::uint64_t>(state.SamplesPlayed);
-                const std::uint64_t consumedSampleFrames =
-                    playedSampleFrames > CompletedAudioSampleFrames
-                        ? playedSampleFrames - CompletedAudioSampleFrames
-                        : 0;
-                const std::uint64_t remainingSampleFrames =
-                    queuedSampleFrames > consumedSampleFrames
-                        ? queuedSampleFrames - consumedSampleFrames
-                        : 0;
-                return static_cast<double>(remainingSampleFrames) / static_cast<double>(AudioSampleRate);
-#endif
             }
 
             std::uint64_t GetQueuedAudioAccumulationSampleFramesLocked() const {
@@ -541,17 +308,6 @@ namespace Inferno {
                 return AdaptiveFrameTime;
             }
 
-            std::size_t GetLiveAudioBufferCount() {
-                std::scoped_lock lock(AudioMutex);
-                return LiveAudioBuffers.size();
-            }
-
-            double GetQueuedAudioDepthSeconds() {
-                std::scoped_lock lock(AudioMutex);
-                ReleaseCompletedAudioBuffersLocked();
-                return GetQueuedAudioDepthSecondsLocked();
-            }
-
             void DrainQueuedAudioPackets() {
                 auto packets = Playback.TakeQueuedAudioPackets();
                 if (packets.empty()) {
@@ -565,37 +321,13 @@ namespace Inferno {
                     return;
                 }
 
-            #if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
                 std::unique_ptr<DynamicSoundEffectInstance> voiceToDestroy;
-            #else
-                IXAudio2SourceVoice* voiceToDestroy = nullptr;
-            #endif
                 {
                     std::scoped_lock lock(AudioMutex);
                     for (auto& packet : packets) {
                         if (packet.pcm.samples.empty() || packet.pcm.sampleRate <= 0 || packet.pcm.channelCount == 0) {
                             continue;
                         }
-
-                    #if 0
-                    printf("orig %d hz %d samples\n", packet.pcm.sampleRate, packet.pcm.samples.size());
-
-                    std::string resampleError;
-                    if (!ResamplePsxMovieAudioPacket(&packet, &resampleError)) {
-                        SPDLOG_WARN("Unable to resample PSX movie audio packet: {}", resampleError);
-                        AudioEnabled = false;
-                        PendingAudioPackets.clear();
-                        LiveAudioBuffers.clear();
-                        if (AudioVoice) {
-                            std::ignore = AudioVoice->Stop(0);
-                            std::ignore = AudioVoice->FlushSourceBuffers();
-                            DestroyAudioVoice(AudioVoice);
-                            AudioVoice = nullptr;
-                        }
-                        return;
-                    }
-                    printf("resampled to %d hz %d samples\n", packet.pcm.sampleRate, packet.pcm.samples.size());
-                    #endif
 
                         if (!AudioVoice) {
                             auto* engine = Sound::GetEngine();
@@ -615,11 +347,7 @@ namespace Inferno {
                             format.nAvgBytesPerSec = format.nSamplesPerSec * format.nBlockAlign;
 
                             try {
-#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
                                 AudioVoice = std::make_unique<DynamicSoundEffectInstance>(engine, nullptr, format.nSamplesPerSec, format.nChannels, format.wBitsPerSample);
-#else
-                                engine->AllocateVoice(&format, SoundEffectInstance_Default, false, &AudioVoice);
-#endif
                             } catch (const std::exception& ex) {
                                 SPDLOG_WARN("Unable to start PSX movie audio playback: AllocateVoice failed: {}", ex.what());
                                 AudioEnabled = false;
@@ -628,11 +356,7 @@ namespace Inferno {
                             }
 
                             if (!AudioVoice) {
-#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
                                 SPDLOG_WARN("Unable to start PSX movie audio playback: DynamicSoundEffectInstance returned no voice");
-#else
-                                SPDLOG_WARN("Unable to start PSX movie audio playback: AllocateVoice returned no voice");
-#endif
                                 AudioEnabled = false;
                                 ClearQueuedAudioStateLocked();
                                 return;
@@ -642,12 +366,7 @@ namespace Inferno {
                         if (packet.pcm.sampleRate != AudioSampleRate || packet.pcm.channelCount != AudioChannelCount) {
                             SPDLOG_WARN("PSX movie audio format changed during playback; disabling audio.");
                             AudioEnabled = false;
-#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
                             voiceToDestroy = std::move(AudioVoice);
-#else
-                            voiceToDestroy = AudioVoice;
-                            AudioVoice = nullptr;
-#endif
                             AudioStarted = false;
                             AudioRunning = false;
                             break;
@@ -657,29 +376,14 @@ namespace Inferno {
                     }
 
                     if (!voiceToDestroy && AudioVoice) {
-#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
-                        auto* refillVoice = AudioVoice.get();
-#else
-                        auto* refillVoice = AudioVoice;
-#endif
                         if (!RefillAudioBuffersLocked()) {
-#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
                             voiceToDestroy = std::move(AudioVoice);
-#else
-                            voiceToDestroy = refillVoice;
-#endif
                         }
                     }
                 }
 
                 if (voiceToDestroy) {
-#if defined(PSX_MOVIE_USE_DYNAMIC_SOUND_EFFECT_INSTANCE)
                     DestroyAudioVoice(voiceToDestroy);
-#else
-                    std::ignore = voiceToDestroy->Stop(0);
-                    std::ignore = voiceToDestroy->FlushSourceBuffers();
-                    DestroyAudioVoice(voiceToDestroy);
-#endif
                     std::scoped_lock lock(AudioMutex);
                     ClearQueuedAudioStateLocked();
                 }
@@ -737,13 +441,6 @@ namespace Inferno {
                         0xFF000000U;
                 }
 
-                /*
-                num_frames++;
-                char buf[32];
-                snprintf(buf, sizeof(buf), "%d", num_frames);
-                SetWindowTextA(GetActiveWindow(), buf);
-                */
-
                 return true;
             }
 
@@ -762,7 +459,7 @@ namespace Inferno {
             }
 
             bool OpenMovieStream(const std::string& filename, std::string* error) {
-                const auto isoPath = /*"/srv/psxout/INTRO_2352.bin";*/ D1_FOLDER / "psx.bin";
+                const auto isoPath = D1_FOLDER / "psx.bin";
                 Image = std::make_unique<std::ifstream>(isoPath, std::ios::binary);
                 if (!*Image) {
                     if (error) *error = "Could not open PSX image: " + isoPath.string();
