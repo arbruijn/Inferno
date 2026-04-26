@@ -23,7 +23,7 @@
 
 namespace Inferno {
     namespace {
-        constexpr float DEFAULT_MOVIE_FRAME_TIME = 1.0f / 15.0f * 1001.0f / 1000.0f;
+        constexpr float DEFAULT_MOVIE_FRAME_TIME = 1.0f / 15.0f;
         constexpr std::size_t VIDEO_BUFFER_TARGET = 2;
         constexpr std::size_t AUDIO_BUFFER_TARGET = 2;
 #if 0
@@ -104,6 +104,7 @@ namespace Inferno {
 #endif
 
         struct PsxMovieState {
+/*
             struct AudioVoiceCallback final : IXAudio2VoiceCallback {
                 PsxMovieState* State = nullptr;
 
@@ -121,12 +122,13 @@ namespace Inferno {
                     }
 
                     std::scoped_lock lock(State->AudioMutex);
-                    State->ReleaseCompletedAudioBuffersLocked();
+                    //State->ReleaseCompletedAudioBuffersLocked();
                 }
 
                 void OnLoopEnd(void*) override {}
                 void OnVoiceError(void*, HRESULT) override {}
             };
+*/
 
             struct AudioBuffer {
                 std::shared_ptr<std::vector<std::int16_t>> Samples;
@@ -141,7 +143,7 @@ namespace Inferno {
             Psx::PsxRgbFrame CurrentFrame;
             std::vector<uint32> RgbaPixels;
             Texture2D FrameTexture;
-            AudioVoiceCallback VoiceCallback;
+            //AudioVoiceCallback VoiceCallback;
             IXAudio2SourceVoice* AudioVoice = nullptr;
             std::deque<Psx::PsxPlaybackAudioPacket> PendingAudioPackets;
             // Keep submitted PCM alive until XAudio2 signals that each buffer finished.
@@ -162,8 +164,7 @@ namespace Inferno {
             int submit_count = 0;
             int lastFrameNum_ = 0;
 
-            PsxMovieState()
-                : VoiceCallback(this) {}
+            //PsxMovieState() : VoiceCallback(this) {}
 
         uint64_t GetClockTimeNs() const {
             using namespace std::chrono;
@@ -233,6 +234,11 @@ namespace Inferno {
                 ClearQueuedAudioStateLocked();
             }
 
+            void ReleaseCompletedAudioBuffers() {
+                std::scoped_lock lock(AudioMutex);
+                ReleaseCompletedAudioBuffersLocked();
+            }
+
             void ReleaseCompletedAudioBuffersLocked() {
                 if (!AudioVoice) {
                     return;
@@ -256,6 +262,11 @@ namespace Inferno {
                     CompletedAudioSampleFrames += LiveAudioBuffers.front().SampleFrames;
                     LiveAudioBuffers.pop_front();
                 }
+            }
+
+            bool RefillAudioBuffers() {
+                std::scoped_lock lock(AudioMutex);
+                return RefillAudioBuffersLocked();
             }
 
             bool RefillAudioBuffersLocked() {
@@ -349,10 +360,15 @@ namespace Inferno {
                 AudioVoice->GetState(&state, 0);
 
                 std::uint64_t queuedSampleFrames = 0;
-                /*for (const auto& buffer : LiveAudioBuffers) {
+                int skip = 1;
+                for (const auto& buffer : LiveAudioBuffers) {
+                    if (skip) {
+                        skip--;
+                        continue;
+                    }
                     queuedSampleFrames += buffer.SampleFrames;
-                }*/
-                int skip = AUDIO_BUFFER_TARGET;
+                }
+                skip = 0; //AUDIO_BUFFER_TARGET;
                 for (const auto& packet : PendingAudioPackets) {
                     if (skip) {
                         skip--;
@@ -387,6 +403,9 @@ namespace Inferno {
             void DrainQueuedAudioPackets() {
                 auto packets = Playback.TakeQueuedAudioPackets();
                 if (packets.empty()) {
+                    if (AudioVoice) {
+                        RefillAudioBuffers();
+                    }
                     return;
                 }
 
@@ -444,7 +463,7 @@ namespace Inferno {
                                 &format,
                                 0,
                                 XAUDIO2_DEFAULT_FREQ_RATIO,
-                                &VoiceCallback,
+                                nullptr, //&VoiceCallback,
                                 nullptr,
                                 nullptr);
                             if (FAILED(hr) || !AudioVoice) {
@@ -723,6 +742,7 @@ namespace Inferno {
             printf("%.2f frame %d dt %.3f ft %.03f\n", totalTime, movie.lastFrameNum_, dt, currentFrameTime);
             movie.DrainQueuedAudioPackets();
         }
+        movie.ReleaseCompletedAudioBuffers();
 
 
         updates++;
