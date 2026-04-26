@@ -27,6 +27,9 @@ namespace Inferno {
         constexpr float DEFAULT_MOVIE_FRAME_TIME = 1.0f / 15.0f;
         constexpr std::size_t VIDEO_BUFFER_TARGET = 2;
         constexpr std::size_t AUDIO_BUFFER_TARGET = 2;
+        constexpr float MIN_ADAPTIVE_FRAME_TIME_SCALE = 1.0f;
+        constexpr float MAX_ADAPTIVE_FRAME_TIME_SCALE = 1.5f;
+        constexpr int AUDIO_QUEUE_CLEAR_FRAMES_BEFORE_PROBE = 8;
 #if 0
         constexpr int PSX_MOVIE_AUDIO_SAMPLE_RATE = 48000;
 
@@ -155,6 +158,8 @@ namespace Inferno {
             std::deque<AudioBuffer> LiveAudioBuffers;
             std::mutex AudioMutex;
             float FrameTime = DEFAULT_MOVIE_FRAME_TIME;
+            float TargetFrameTime = DEFAULT_MOVIE_FRAME_TIME;
+            float AdaptiveFrameTime = DEFAULT_MOVIE_FRAME_TIME;
             float Accumulator = 0.0f;
             bool HasFrame = false;
             bool FrameDirty = false;
@@ -165,6 +170,8 @@ namespace Inferno {
             std::uint8_t AudioChannelCount = 0;
             std::size_t LoggedAudioBufferSubmissions = 0;
             std::uint64_t CompletedAudioSampleFrames = 0;
+            std::uint64_t QueuedAudioAccumulationSampleFrames = 0;
+            int ConsecutiveAudioQueueClearFrames = 0;
             bool Presenting = false;
             int submit_count = 0;
             int lastFrameNum_ = 0;
@@ -202,6 +209,8 @@ namespace Inferno {
                 RgbaPixels.clear();
                 FrameTexture.Release();
                 FrameTime = DEFAULT_MOVIE_FRAME_TIME;
+                TargetFrameTime = DEFAULT_MOVIE_FRAME_TIME;
+                AdaptiveFrameTime = DEFAULT_MOVIE_FRAME_TIME;
                 Accumulator = 0.0f;
                 HasFrame = false;
                 FrameDirty = false;
@@ -212,6 +221,24 @@ namespace Inferno {
                 PendingAudioPackets.clear();
                 LiveAudioBuffers.clear();
                 CompletedAudioSampleFrames = 0;
+                QueuedAudioAccumulationSampleFrames = 0;
+                ConsecutiveAudioQueueClearFrames = 0;
+            }
+
+            void SetNominalFrameTime(float frameTime) {
+                if (frameTime <= 0.0f) {
+                    return;
+                }
+
+                const float oldFrameTime = FrameTime > 0.0f ? FrameTime : frameTime;
+                const float ratio = frameTime / oldFrameTime;
+                FrameTime = frameTime;
+                TargetFrameTime = std::clamp(TargetFrameTime * ratio,
+                                             FrameTime * MIN_ADAPTIVE_FRAME_TIME_SCALE,
+                                             FrameTime * MAX_ADAPTIVE_FRAME_TIME_SCALE);
+                AdaptiveFrameTime = std::clamp(AdaptiveFrameTime * ratio,
+                                               FrameTime * MIN_ADAPTIVE_FRAME_TIME_SCALE,
+                                               FrameTime * MAX_ADAPTIVE_FRAME_TIME_SCALE);
             }
 
             void DestroyAudioVoice(IXAudio2SourceVoice* voice) {
@@ -462,6 +489,59 @@ namespace Inferno {
 #endif
             }
 
+            std::uint64_t GetQueuedAudioAccumulationSampleFramesLocked() const {
+                std::uint64_t queuedSampleFrames = 0;
+                for (const auto& packet : PendingAudioPackets) {
+                    queuedSampleFrames += packet.pcm.sampleFrames;
+                }
+                return queuedSampleFrames;
+            }
+
+            std::uint64_t GetQueuedAudioAccumulationSampleFrames() {
+                std::scoped_lock lock(AudioMutex);
+                QueuedAudioAccumulationSampleFrames = GetQueuedAudioAccumulationSampleFramesLocked();
+                return QueuedAudioAccumulationSampleFrames;
+            }
+
+            float GetAdaptiveFrameTime(float dt) {
+                if (!AudioRunning || FrameTime <= 0.0f) {
+                    TargetFrameTime = FrameTime;
+                    AdaptiveFrameTime = FrameTime;
+                    ConsecutiveAudioQueueClearFrames = 0;
+                    return FrameTime;
+                }
+
+                const auto queuedSampleFrames = GetQueuedAudioAccumulationSampleFrames();
+                const float minFrameTime = FrameTime * MIN_ADAPTIVE_FRAME_TIME_SCALE;
+                const float maxFrameTime = FrameTime * MAX_ADAPTIVE_FRAME_TIME_SCALE;
+
+                if (queuedSampleFrames > 0) {
+                    ConsecutiveAudioQueueClearFrames = 0;
+
+                    const double queuedSeconds = AudioSampleRate > 0
+                        ? static_cast<double>(queuedSampleFrames) / static_cast<double>(AudioSampleRate)
+                        : static_cast<double>(FrameTime);
+                    const float pressure = std::clamp(static_cast<float>(queuedSeconds / FrameTime), 1.0f, 4.0f);
+                    TargetFrameTime += FrameTime * 0.01f * pressure;
+                } else {
+                    ++ConsecutiveAudioQueueClearFrames;
+
+                    if (ConsecutiveAudioQueueClearFrames >= AUDIO_QUEUE_CLEAR_FRAMES_BEFORE_PROBE) {
+                        TargetFrameTime -= FrameTime * 0.001f;
+                    }
+                }
+
+                TargetFrameTime = std::clamp(TargetFrameTime, minFrameTime, maxFrameTime);
+
+                const float adjustment = std::clamp(dt * 2.5f, 0.02f, 0.12f);
+                AdaptiveFrameTime += (TargetFrameTime - AdaptiveFrameTime) * adjustment;
+                if (std::abs(TargetFrameTime - AdaptiveFrameTime) < 0.00001f) {
+                    AdaptiveFrameTime = TargetFrameTime;
+                }
+
+                return AdaptiveFrameTime;
+            }
+
             std::size_t GetLiveAudioBufferCount() {
                 std::scoped_lock lock(AudioMutex);
                 return LiveAudioBuffers.size();
@@ -637,7 +717,7 @@ namespace Inferno {
 
                 CurrentFrame = std::move(buffered.frame);
                 if (buffered.durationSeconds > 0.0) {
-                    FrameTime = static_cast<float>(buffered.durationSeconds);
+                    SetNominalFrameTime(static_cast<float>(buffered.durationSeconds));
                 }
                 if (CurrentFrame.width == 0 || CurrentFrame.height == 0 || CurrentFrame.pixels.empty()) {
                     if (error) *error = "Encountered an empty PSX movie frame.";
@@ -794,22 +874,6 @@ namespace Inferno {
 
         movie.DrainQueuedAudioPackets();
 
-        auto GetEffectiveFrameTime = [&]() {
-            const float nominalFrameTime = movie.FrameTime;
-            if (!movie.AudioRunning || nominalFrameTime <= 0.0f || movie.Playback.BufferedFrameCount() == 0) {
-                return nominalFrameTime;
-            }
-
-            const double queuedAudioSeconds = movie.GetQueuedAudioDepthSeconds();
-            const double targetQueuedAudioSeconds =
-                static_cast<double>(movie.Playback.BufferedFrameCount() - 1) * nominalFrameTime;
-            const double correctedFrameTime =
-                std::clamp(queuedAudioSeconds - targetQueuedAudioSeconds,
-                           0.0,
-                           static_cast<double>(nominalFrameTime) * 2.0);
-            return static_cast<float>(correctedFrameTime);
-        };
-
         // wait until frametimes are stable
         if (!movie.Presenting && movie.FrameTime > 0.0f && dt > movie.FrameTime) {
             return;
@@ -822,7 +886,7 @@ namespace Inferno {
             totalTime += dt;
         }
         while (true) {
-            const float currentFrameTime = GetEffectiveFrameTime();
+            const float currentFrameTime = movie.GetAdaptiveFrameTime(dt);
             if (currentFrameTime > 0.0f && movie.Accumulator < currentFrameTime) {
                 break;
             }
@@ -849,10 +913,12 @@ namespace Inferno {
 
         updates++;
                 char buf[80];
-                snprintf(buf, sizeof(buf), "%.2f m %.2f u %.2f bv %zu ba %zu ab %d vr %.2f ar %.2f fn %d ap %zu", (float)frames/updates, 1/movie.FrameTime, 1/dt,
+                const auto queuedAudioSamples = movie.GetQueuedAudioAccumulationSampleFrames();
+                snprintf(buf, sizeof(buf), "%.2f m %.2f u %.2f af %.2f tf %.2f bv %zu ba %zu ab %d fn %d qs %llu", (float)frames/updates, 1/movie.FrameTime, 1/dt,
+                    1/movie.AdaptiveFrameTime, 1/movie.TargetFrameTime,
                     movie.Playback.BufferedFrameCount(), movie.Playback.BufferedAudioPacketsCount(),
-                    movie.GetAudioPendingBufferCount(), frames / totalTime, movie.submit_count / totalTime,
-                    movie.lastFrameNum_, movie.PendingAudioPackets.size());
+                    movie.GetAudioPendingBufferCount(),
+                    movie.lastFrameNum_, static_cast<unsigned long long>(queuedAudioSamples));
                     //movie.LiveAudioBuffers.size()); //movie.Audio->GetPendingBufferCount());
                 SetWindowTextA(GetActiveWindow(), buf);
     }
