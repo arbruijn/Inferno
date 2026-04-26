@@ -66,6 +66,29 @@ bool IsoNamesMatch(const std::string& recordName, const std::string& requestedNa
     return NormalizeIsoName(recordName) == NormalizeIsoName(requestedName);
 }
 
+std::size_t SectorCountForIsoFileSize(std::size_t size) {
+    return (size + kPsxMode2_2048.payloadSize - 1) / kPsxMode2_2048.payloadSize;
+}
+
+std::size_t ExpandedReadSize(std::size_t fileSize, const PsxCdSectorLayout& layout) {
+    if (layout.payloadSize == kPsxMode2_2048.payloadSize &&
+        layout.rawSectorSize == kPsxMode2_2048.rawSectorSize &&
+        layout.payloadOffset == kPsxMode2_2048.payloadOffset) {
+        return fileSize;
+    }
+
+    if ((layout.rawSectorSize == kPsxMode2_2336.rawSectorSize &&
+         layout.payloadSize == kPsxMode2_2336.payloadSize &&
+         layout.payloadOffset == kPsxMode2_2336.payloadOffset) ||
+        (layout.rawSectorSize == kPsxMode2_2352.rawSectorSize &&
+         layout.payloadSize == kPsxMode2_2352.payloadSize &&
+         layout.payloadOffset == kPsxMode2_2352.payloadOffset)) {
+        return SectorCountForIsoFileSize(fileSize) * layout.payloadSize;
+    }
+
+    return fileSize;
+}
+
 } // namespace
 
 class PsxIsoFileStream final : public PsxReadStream {
@@ -518,16 +541,7 @@ bool PsxIso9660Reader::ReadFile(const std::string& path,
         return false;
     }
 
-    std::size_t readSize = entry.size;
-    if (layout.payloadSize == kPsxMode2_2336.payloadSize &&
-        layout.rawSectorSize == kPsxMode2_2336.rawSectorSize &&
-        layout.payloadOffset == kPsxMode2_2336.payloadOffset) {
-        const std::size_t sectorCount =
-            (entry.size + kPsxMode2_2048.payloadSize - 1) / kPsxMode2_2048.payloadSize;
-        readSize = sectorCount * kPsxMode2_2336.payloadSize;
-    }
-
-    return ReadExtent(entry.extentLba, readSize, output, layout, error);
+    return ReadExtent(entry.extentLba, ExpandedReadSize(entry.size, layout), output, layout, error);
 }
 
 std::unique_ptr<PsxReadStream> PsxIso9660Reader::OpenFile(const std::string& path,
@@ -547,16 +561,10 @@ std::unique_ptr<PsxReadStream> PsxIso9660Reader::OpenFile(const std::string& pat
         return nullptr;
     }
 
-    std::size_t readSize = entry.size;
-    if (layout.payloadSize == kPsxMode2_2336.payloadSize &&
-        layout.rawSectorSize == kPsxMode2_2336.rawSectorSize &&
-        layout.payloadOffset == kPsxMode2_2336.payloadOffset) {
-        const std::size_t sectorCount =
-            (entry.size + kPsxMode2_2048.payloadSize - 1) / kPsxMode2_2048.payloadSize;
-        readSize = sectorCount * kPsxMode2_2336.payloadSize;
-    }
-
-    return std::make_unique<PsxIsoFileStream>(this, entry.extentLba, readSize, layout);
+    return std::make_unique<PsxIsoFileStream>(this,
+                                              entry.extentLba,
+                                              ExpandedReadSize(entry.size, layout),
+                                              layout);
 }
 
 const PsxIsoDirectoryEntry& PsxIso9660Reader::RootEntry() const noexcept {
