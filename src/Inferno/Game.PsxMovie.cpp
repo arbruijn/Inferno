@@ -427,7 +427,7 @@ namespace Inferno {
                 }
 
                 std::uint64_t queuedSampleFrames = 0;
-                int skip = 1;
+                int skip = AUDIO_BUFFER_TARGET;
                 for (const auto& buffer : LiveAudioBuffers) {
                     if (skip) {
                         skip--;
