@@ -104,6 +104,30 @@ namespace Inferno {
 #endif
 
         struct PsxMovieState {
+            struct AudioVoiceCallback final : IXAudio2VoiceCallback {
+                PsxMovieState* State = nullptr;
+
+                explicit AudioVoiceCallback(PsxMovieState* state = nullptr)
+                    : State(state) {}
+
+                void OnVoiceProcessingPassStart(UINT32) override {}
+                void OnVoiceProcessingPassEnd() override {}
+                void OnStreamEnd() override {}
+                void OnBufferStart(void*) override {}
+
+                void OnBufferEnd(void*) override {
+                    if (!State) {
+                        return;
+                    }
+
+                    std::scoped_lock lock(State->AudioMutex);
+                    State->ReleaseCompletedAudioBuffersLocked();
+                }
+
+                void OnLoopEnd(void*) override {}
+                void OnVoiceError(void*, HRESULT) override {}
+            };
+
             struct AudioBuffer {
                 std::shared_ptr<std::vector<std::int16_t>> Samples;
                 std::uint64_t SampleFrames = 0;
@@ -117,6 +141,7 @@ namespace Inferno {
             Psx::PsxRgbFrame CurrentFrame;
             std::vector<uint32> RgbaPixels;
             Texture2D FrameTexture;
+            AudioVoiceCallback VoiceCallback;
             IXAudio2SourceVoice* AudioVoice = nullptr;
             std::deque<Psx::PsxPlaybackAudioPacket> PendingAudioPackets;
             // Keep submitted PCM alive until XAudio2 signals that each buffer finished.
@@ -136,6 +161,9 @@ namespace Inferno {
             bool Presenting = false;
             int submit_count = 0;
             int lastFrameNum_ = 0;
+
+            PsxMovieState()
+                : VoiceCallback(this) {}
 
         uint64_t GetClockTimeNs() const {
             using namespace std::chrono;
@@ -181,21 +209,28 @@ namespace Inferno {
             }
 
             void StopAudio() {
-                std::scoped_lock lock(AudioMutex);
-                if (AudioVoice) {
-                    std::ignore = AudioVoice->Stop(0);
-                    std::ignore = AudioVoice->FlushSourceBuffers();
-                    AudioVoice->DestroyVoice();
+                IXAudio2SourceVoice* voiceToDestroy = nullptr;
+                {
+                    std::scoped_lock lock(AudioMutex);
+                    voiceToDestroy = AudioVoice;
                     AudioVoice = nullptr;
+                    AudioStarted = false;
+                    AudioRunning = false;
+                    AudioSampleRate = 0;
+                    AudioChannelCount = 0;
+                    LoggedAudioBufferSubmissions = 0;
+                    submit_count = 0;
+                    AudioEnabled = true;
                 }
+
+                if (voiceToDestroy) {
+                    std::ignore = voiceToDestroy->Stop(0);
+                    std::ignore = voiceToDestroy->FlushSourceBuffers();
+                    voiceToDestroy->DestroyVoice();
+                }
+
+                std::scoped_lock lock(AudioMutex);
                 ClearQueuedAudioStateLocked();
-                AudioStarted = false;
-                AudioRunning = false;
-                AudioSampleRate = 0;
-                AudioChannelCount = 0;
-                LoggedAudioBufferSubmissions = 0;
-                submit_count = 0;
-                AudioEnabled = true;
             }
 
             void ReleaseCompletedAudioBuffersLocked() {
@@ -223,9 +258,9 @@ namespace Inferno {
                 }
             }
 
-            void RefillAudioBuffersLocked() {
+            bool RefillAudioBuffersLocked() {
                 if (!AudioVoice || !AudioEnabled) {
-                    return;
+                    return true;
                 }
 
                 // Retire submitted PCM by comparing it with XAudio2's actual
@@ -266,14 +301,10 @@ namespace Inferno {
                     if (FAILED(hr)) {
                         SPDLOG_WARN("Unable to submit PSX movie audio buffer to XAudio2.");
                         AudioEnabled = false;
-                        ClearQueuedAudioStateLocked();
-                        std::ignore = AudioVoice->Stop(0);
-                        std::ignore = AudioVoice->FlushSourceBuffers();
-                        AudioVoice->DestroyVoice();
                         AudioVoice = nullptr;
                         AudioStarted = false;
                         AudioRunning = false;
-                        return;
+                        return false;
                     }
                     AudioBuffer liveBuffer;
                     liveBuffer.Samples = std::move(samples);
@@ -288,17 +319,15 @@ namespace Inferno {
                     if (FAILED(hr)) {
                         SPDLOG_WARN("Unable to start PSX movie audio playback.");
                         AudioEnabled = false;
-                        ClearQueuedAudioStateLocked();
-                        std::ignore = AudioVoice->Stop(0);
-                        std::ignore = AudioVoice->FlushSourceBuffers();
-                        AudioVoice->DestroyVoice();
                         AudioVoice = nullptr;
                         AudioStarted = false;
                         AudioRunning = false;
-                        return;
+                        return false;
                     }
                     AudioStarted = true;
                 }
+
+                return true;
             }
 
             int GetAudioPendingBufferCount() const {
@@ -365,11 +394,13 @@ namespace Inferno {
                     return;
                 }
 
-                std::scoped_lock lock(AudioMutex);
-                for (auto& packet : packets) {
-                    if (packet.pcm.samples.empty() || packet.pcm.sampleRate <= 0 || packet.pcm.channelCount == 0) {
-                        continue;
-                    }
+                IXAudio2SourceVoice* voiceToDestroy = nullptr;
+                {
+                    std::scoped_lock lock(AudioMutex);
+                    for (auto& packet : packets) {
+                        if (packet.pcm.samples.empty() || packet.pcm.sampleRate <= 0 || packet.pcm.channelCount == 0) {
+                            continue;
+                        }
 
                     #if 0
                     printf("orig %d hz %d samples\n", packet.pcm.sampleRate, packet.pcm.samples.size());
@@ -391,57 +422,66 @@ namespace Inferno {
                     printf("resampled to %d hz %d samples\n", packet.pcm.sampleRate, packet.pcm.samples.size());
                     #endif
 
-                    if (!AudioVoice) {
-                        auto* engine = Sound::GetEngine();
-                        if (engine == nullptr || engine->GetInterface() == nullptr) {
-                            AudioEnabled = false;
-                            return;
+                        if (!AudioVoice) {
+                            auto* engine = Sound::GetEngine();
+                            if (engine == nullptr || engine->GetInterface() == nullptr) {
+                                AudioEnabled = false;
+                                return;
+                            }
+
+                            AudioSampleRate = packet.pcm.sampleRate;
+                            AudioChannelCount = packet.pcm.channelCount;
+                            WAVEFORMATEX format{};
+                            format.wFormatTag = WAVE_FORMAT_PCM;
+                            format.nChannels = AudioChannelCount;
+                            format.nSamplesPerSec = AudioSampleRate;
+                            format.wBitsPerSample = 16;
+                            format.nBlockAlign = static_cast<WORD>(format.nChannels * (format.wBitsPerSample / 8));
+                            format.nAvgBytesPerSec = format.nSamplesPerSec * format.nBlockAlign;
+
+                            HRESULT hr = engine->GetInterface()->CreateSourceVoice(
+                                &AudioVoice,
+                                &format,
+                                0,
+                                XAUDIO2_DEFAULT_FREQ_RATIO,
+                                &VoiceCallback,
+                                nullptr,
+                                nullptr);
+                            if (FAILED(hr) || !AudioVoice) {
+                                SPDLOG_WARN("Unable to start PSX movie audio playback: CreateSourceVoice failed with 0x{:08X}", static_cast<unsigned int>(hr));
+                                AudioEnabled = false;
+                                ClearQueuedAudioStateLocked();
+                                return;
+                            }
                         }
 
-                        AudioSampleRate = packet.pcm.sampleRate;
-                        AudioChannelCount = packet.pcm.channelCount;
-                        WAVEFORMATEX format{};
-                        format.wFormatTag = WAVE_FORMAT_PCM;
-                        format.nChannels = AudioChannelCount;
-                        format.nSamplesPerSec = AudioSampleRate;
-                        format.wBitsPerSample = 16;
-                        format.nBlockAlign = static_cast<WORD>(format.nChannels * (format.wBitsPerSample / 8));
-                        format.nAvgBytesPerSec = format.nSamplesPerSec * format.nBlockAlign;
-
-                        HRESULT hr = engine->GetInterface()->CreateSourceVoice(
-                            &AudioVoice,
-                            &format,
-                            0,
-                            XAUDIO2_DEFAULT_FREQ_RATIO,
-                            nullptr,
-                            nullptr,
-                            nullptr);
-                        if (FAILED(hr) || !AudioVoice) {
-                            SPDLOG_WARN("Unable to start PSX movie audio playback: CreateSourceVoice failed with 0x{:08X}", static_cast<unsigned int>(hr));
+                        if (packet.pcm.sampleRate != AudioSampleRate || packet.pcm.channelCount != AudioChannelCount) {
+                            SPDLOG_WARN("PSX movie audio format changed during playback; disabling audio.");
                             AudioEnabled = false;
-                            ClearQueuedAudioStateLocked();
-                            return;
-                        }
-                    }
-
-                    if (packet.pcm.sampleRate != AudioSampleRate || packet.pcm.channelCount != AudioChannelCount) {
-                        SPDLOG_WARN("PSX movie audio format changed during playback; disabling audio.");
-                        AudioEnabled = false;
-                        ClearQueuedAudioStateLocked();
-                        if (AudioVoice) {
-                            std::ignore = AudioVoice->Stop(0);
-                            std::ignore = AudioVoice->FlushSourceBuffers();
-                            AudioVoice->DestroyVoice();
+                            voiceToDestroy = AudioVoice;
                             AudioVoice = nullptr;
+                            AudioStarted = false;
+                            AudioRunning = false;
+                            break;
                         }
-                        return;
+
+                        PendingAudioPackets.push_back(std::move(packet));
                     }
 
-                    PendingAudioPackets.push_back(std::move(packet));
+                    if (!voiceToDestroy && AudioVoice) {
+                        auto* refillVoice = AudioVoice;
+                        if (!RefillAudioBuffersLocked()) {
+                            voiceToDestroy = refillVoice;
+                        }
+                    }
                 }
 
-                if (AudioVoice) {
-                    RefillAudioBuffersLocked();
+                if (voiceToDestroy) {
+                    std::ignore = voiceToDestroy->Stop(0);
+                    std::ignore = voiceToDestroy->FlushSourceBuffers();
+                    voiceToDestroy->DestroyVoice();
+                    std::scoped_lock lock(AudioMutex);
+                    ClearQueuedAudioStateLocked();
                 }
             }
 
