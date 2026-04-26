@@ -209,6 +209,18 @@ namespace Inferno {
                 CompletedAudioSampleFrames = 0;
             }
 
+            void DestroyAudioVoice(IXAudio2SourceVoice* voice) {
+                if (!voice) {
+                    return;
+                }
+
+                if (auto* engine = Sound::GetEngine()) {
+                    engine->DestroyVoice(voice);
+                } else {
+                    voice->DestroyVoice();
+                }
+            }
+
             void StopAudio() {
                 IXAudio2SourceVoice* voiceToDestroy = nullptr;
                 {
@@ -227,7 +239,7 @@ namespace Inferno {
                 if (voiceToDestroy) {
                     std::ignore = voiceToDestroy->Stop(0);
                     std::ignore = voiceToDestroy->FlushSourceBuffers();
-                    voiceToDestroy->DestroyVoice();
+                    DestroyAudioVoice(voiceToDestroy);
                 }
 
                 std::scoped_lock lock(AudioMutex);
@@ -433,7 +445,7 @@ namespace Inferno {
                         if (AudioVoice) {
                             std::ignore = AudioVoice->Stop(0);
                             std::ignore = AudioVoice->FlushSourceBuffers();
-                            AudioVoice->DestroyVoice();
+                            DestroyAudioVoice(AudioVoice);
                             AudioVoice = nullptr;
                         }
                         return;
@@ -458,16 +470,17 @@ namespace Inferno {
                             format.nBlockAlign = static_cast<WORD>(format.nChannels * (format.wBitsPerSample / 8));
                             format.nAvgBytesPerSec = format.nSamplesPerSec * format.nBlockAlign;
 
-                            HRESULT hr = engine->GetInterface()->CreateSourceVoice(
-                                &AudioVoice,
-                                &format,
-                                0,
-                                XAUDIO2_DEFAULT_FREQ_RATIO,
-                                nullptr, //&VoiceCallback,
-                                nullptr,
-                                nullptr);
-                            if (FAILED(hr) || !AudioVoice) {
-                                SPDLOG_WARN("Unable to start PSX movie audio playback: CreateSourceVoice failed with 0x{:08X}", static_cast<unsigned int>(hr));
+                            try {
+                                engine->AllocateVoice(&format, SoundEffectInstance_Default, false, &AudioVoice);
+                            } catch (const std::exception& ex) {
+                                SPDLOG_WARN("Unable to start PSX movie audio playback: AllocateVoice failed: {}", ex.what());
+                                AudioEnabled = false;
+                                ClearQueuedAudioStateLocked();
+                                return;
+                            }
+
+                            if (!AudioVoice) {
+                                SPDLOG_WARN("Unable to start PSX movie audio playback: AllocateVoice returned no voice");
                                 AudioEnabled = false;
                                 ClearQueuedAudioStateLocked();
                                 return;
@@ -498,7 +511,7 @@ namespace Inferno {
                 if (voiceToDestroy) {
                     std::ignore = voiceToDestroy->Stop(0);
                     std::ignore = voiceToDestroy->FlushSourceBuffers();
-                    voiceToDestroy->DestroyVoice();
+                    DestroyAudioVoice(voiceToDestroy);
                     std::scoped_lock lock(AudioMutex);
                     ClearQueuedAudioStateLocked();
                 }
