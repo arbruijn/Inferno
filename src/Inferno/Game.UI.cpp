@@ -296,48 +296,7 @@ namespace Inferno::UI {
         }
     };
 
-    class CheatWarpDialog : public DialogBase {
-        MissionInfo _mission;
-        int _level = 1;
-
-    public:
-        CheatWarpDialog(MissionInfo mission) : DialogBase("farmerjoe", false), _mission(std::move(mission)) {
-            Size = Vector2(_titleSize.x + DIALOG_PADDING * 2, 170);
-            CloseOnClickOutside = true;
-
-            auto description = make_unique<Label>(fmt::format("1 to {}", _mission.Levels.size()), FontSize::MediumBlue);
-            description->HorizontalAlignment = AlignH::Center;
-            description->Position.y = 50;
-            description->Color = DIALOG_TITLE_COLOR;
-
-            auto levelSelect = make_unique<Spinner>(1, (int)_mission.Levels.size(), _level);
-            levelSelect->Position.y = 85;
-            levelSelect->HorizontalAlignment = AlignH::Center;
-
-            AddChild(std::move(description));
-            AddChild(std::move(levelSelect));
-
-            auto closeButton = make_unique<Button>("ok", [this] {
-                State = CloseState::Accept;
-            });
-            closeButton->HorizontalAlignment = AlignH::Center;
-            closeButton->VerticalAlignment = AlignV::Bottom;
-            closeButton->Margin = Vector2(0, DIALOG_PADDING);
-            closeButton->ActionSound = "";
-            AddChild(std::move(closeButton));
-        }
-
-        void OnUpdate() override {
-            DialogBase::OnUpdate();
-
-            if (Input::MenuActions.IsSet(MenuAction::Confirm))
-                State = CloseState::Accept;
-        }
-
-        int Level() const { return _level; }
-    };
-
-    using DifficultyCallback = std::function<void(DifficultyLevel)>;
+    using LevelSelectCallback = std::function<void(int)>;
 
     class DifficultyDialog : public DialogBase {
         gsl::strict_not_null<DifficultyLevel*> _value;
@@ -493,13 +452,19 @@ namespace Inferno::UI {
         };
     }
 
-    void ShowLevelSelect(MissionInfo& mission, int& level, DifficultyLevel& difficulty) {
+    void ShowLevelSelect(MissionInfo& mission, int& level, LevelSelectCallback onAccept) {
         auto screen = ShowScreen(make_unique<LevelSelectDialog>((int)mission.Levels.size(), level));
 
-        screen->CloseCallback = [&mission, &difficulty, &level](CloseState state) {
-            if (state == CloseState::Accept)
-                ShowDifficultySelect(mission, level, difficulty);
+        screen->CloseCallback = [&level, onAccept = std::move(onAccept)](CloseState state) mutable {
+            if (state == CloseState::Accept && onAccept)
+                onAccept(level);
         };
+    }
+
+    void ShowLevelSelect(MissionInfo& mission, int& level, DifficultyLevel& difficulty) {
+        ShowLevelSelect(mission, level, [&mission, &difficulty, &level](int) {
+            ShowDifficultySelect(mission, level, difficulty);
+        });
     }
 
     void ShowCheatWarpDialog() {
@@ -509,16 +474,10 @@ namespace Inferno::UI {
             return;
         }
 
-        auto dialog = make_unique<CheatWarpDialog>(*mission);
-        auto* dialogPtr = dialog.get();
-        auto screen = ShowScreen(std::move(dialog));
-
-        screen->CloseCallback = [mission = std::move(*mission), dialogPtr](CloseState state) mutable {
-            if (state != CloseState::Accept)
-                return;
-
-            Game::LoadLevelFromMission(mission, dialogPtr->Level(), false);
-        };
+        int level = 1;
+        ShowLevelSelect(*mission, level, [mission = std::move(*mission)](int level) mutable {
+            Game::LoadLevelFromMission(mission, level, false);
+        });
     }
 
     class PlayD1Dialog : public DialogBase {
