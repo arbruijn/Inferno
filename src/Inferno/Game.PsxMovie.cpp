@@ -22,9 +22,9 @@
 
 namespace Inferno {
     namespace {
-        constexpr float DEFAULT_MOVIE_FRAME_TIME = 1.0f / 15.0f;
-        constexpr std::size_t VIDEO_BUFFER_TARGET = 3;
-        constexpr std::size_t AUDIO_BUFFER_TARGET = 3;
+        constexpr float DEFAULT_MOVIE_FRAME_TIME = 1.0f / 15.0f * 1000.0f / 1001.0f;
+        constexpr std::size_t VIDEO_BUFFER_TARGET = 2;
+        constexpr std::size_t AUDIO_BUFFER_TARGET = 2;
         constexpr float MIN_ADAPTIVE_FRAME_TIME_SCALE = 1.0f;
         constexpr float MAX_ADAPTIVE_FRAME_TIME_SCALE = 1.5f;
         constexpr int AUDIO_QUEUE_CLEAR_FRAMES_BEFORE_PROBE = 8;
@@ -60,7 +60,7 @@ namespace Inferno {
             std::uint8_t AudioChannelCount = 0;
             std::size_t LoggedAudioBufferSubmissions = 0;
             std::uint64_t CompletedAudioSampleFrames = 0;
-            std::uint64_t QueuedAudioAccumulationSampleFrames = 0;
+            std::uint64_t QueuedAudioSampleFrames = 0;
             int ConsecutiveAudioQueueClearFrames = 0;
             bool Presenting = false;
             int lastFrameNum_ = 0;
@@ -107,7 +107,7 @@ namespace Inferno {
             void ClearQueuedAudioStateLocked() {
                 PendingAudioPackets.clear();
                 LiveAudioBuffers.clear();
-                QueuedAudioAccumulationSampleFrames = 0;
+                QueuedAudioSampleFrames = 0;
                 ConsecutiveAudioQueueClearFrames = 0;
             }
 
@@ -253,18 +253,23 @@ namespace Inferno {
                 return AudioVoice->GetPendingBufferCount();
             }
 
-            std::uint64_t GetQueuedAudioAccumulationSampleFramesLocked() const {
+            std::uint64_t GetQueuedAudioSampleFramesLocked() const {
                 std::uint64_t queuedSampleFrames = 0;
+                int skip = 1;
                 for (const auto& packet : PendingAudioPackets) {
+                    if (skip) {
+                        skip--;
+                        continue;
+                    }
                     queuedSampleFrames += packet.pcm.sampleFrames;
                 }
                 return queuedSampleFrames;
             }
 
-            std::uint64_t GetQueuedAudioAccumulationSampleFrames() {
+            std::uint64_t GetQueuedAudioSampleFrames() {
                 std::scoped_lock lock(AudioMutex);
-                QueuedAudioAccumulationSampleFrames = GetQueuedAudioAccumulationSampleFramesLocked();
-                return QueuedAudioAccumulationSampleFrames;
+                QueuedAudioSampleFrames = GetQueuedAudioSampleFramesLocked();
+                return QueuedAudioSampleFrames;
             }
 
             float GetAdaptiveFrameTime(float dt) {
@@ -275,7 +280,7 @@ namespace Inferno {
                     return FrameTime;
                 }
 
-                const auto queuedSampleFrames = GetQueuedAudioAccumulationSampleFrames();
+                const auto queuedSampleFrames = GetQueuedAudioSampleFrames();
                 const float minFrameTime = FrameTime * MIN_ADAPTIVE_FRAME_TIME_SCALE;
                 const float maxFrameTime = FrameTime * MAX_ADAPTIVE_FRAME_TIME_SCALE;
 
@@ -606,7 +611,7 @@ namespace Inferno {
 
         updates++;
                 char buf[128];
-                const auto queuedAudioSamples = movie.GetQueuedAudioAccumulationSampleFrames();
+                const auto queuedAudioSamples = movie.GetQueuedAudioSampleFrames();
                 snprintf(buf, sizeof(buf), "%.2f m %.2f u %.2f af %.2f tf %.2f bv %zu ba %zu ab %d fn %d qs %llu", (float)frames/updates, 1/movie.FrameTime, 1/dt,
                     1/movie.AdaptiveFrameTime, 1/movie.TargetFrameTime,
                     movie.Playback.BufferedFrameCount(), movie.Playback.BufferedAudioPacketsCount(),
