@@ -32,7 +32,6 @@
 #include "Resources.h"
 #include "SoundSystem.h"
 #include "VirtualFileSystem.h"
-#include "Psx/PsxXaAudio.h"
 
 using namespace DirectX;
 

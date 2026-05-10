@@ -8,6 +8,7 @@
 #include "Input.h"
 #include "Resources.h"
 #include "VirtualFileSystem.h"
+#include "Psx/PsxXaAudio.h"
 
 namespace Inferno {
     void BriefingState::Forward() {
@@ -316,5 +317,11 @@ vaporization of the facility.
         Game::Briefing = BriefingState(briefing, levelNumber, level.IsDescent1(), endgame, lastScreenOnly);
         LoadBriefingResources(Game::Briefing, LoadFlag::LevelType);
         Game::SetState(GameState::Briefing);
+        if (level.IsDescent1() && mission.Name == Game::FIRST_STRIKE_NAME) {
+            int psxNum = 3 + (levelNumber / 8);
+            int psxChan = levelNumber % 8;
+            auto psxName = psxNum <= 3 ? "WILBUR" + std::to_string(psxNum) : "MR_ED" + std::to_string(psxNum - 3);
+            Psx::PlayXaAudio("DESCENT/" + psxName + ".XA", psxChan);
+        }
     }
 }

@@ -71,7 +71,7 @@ namespace {
                 voiceToStop->Stop(true);
             }
 
-            _voice->SetVolume(VolumeToAmplitudeRatio(Settings::Inferno.MusicVolume));
+            //_voice->SetVolume(VolumeToAmplitudeRatio(Settings::Inferno.MusicVolume));
             SubmitAllBuffers(*_voice);
 
             try {
