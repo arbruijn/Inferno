@@ -652,10 +652,7 @@ namespace Inferno::Render {
             MaterialsChanged = false;
         }
 
-        if (PsxMovieVisible) {
-            DrawPsxMovie(ctx, Adapter->BriefingColorBuffer);
-        }
-        else if (Game::BriefingVisible) {
+        if (Game::BriefingVisible) {
             DrawBriefing(ctx, Adapter->BriefingColorBuffer, Game::Briefing);
         }
 
@@ -747,6 +744,10 @@ namespace Inferno::Render {
         compose->SetSource(cmdList, Adapter->SceneColorBuffer.GetSRV());
         compose->SetSampler(cmdList, Settings::Graphics.UpscaleFilter == UpscaleFilterMode::Point ? Heaps->States.PointClamp() : Heaps->States.LinearClamp());
         cmdList->DrawInstanced(3, 1, 0, 0);
+
+        if (PsxMovieVisible) {
+            DrawPsxMovie(ctx, Adapter->CompositionBuffer);
+        }
 
         // Create a screenshot without the HUD
         if (TakeScoreScreenshot) {

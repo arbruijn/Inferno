@@ -718,7 +718,6 @@ namespace Inferno::Game {
             case GameState::Briefing:
                 if (PsxMovieVisible) {
                     UpdatePsxMovie(dt);
-                    DrawBriefing();
                 }
                 else if (Game::Briefing.IsValid()) {
                     Game::BriefingVisible = true;

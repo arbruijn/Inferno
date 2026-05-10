@@ -649,12 +649,11 @@ namespace Inferno {
         ctx.SetRenderTarget(target.GetRTV());
         ctx.SetViewportAndScissor(target.GetSize());
 
-        Render::BriefingCanvas->SetSize(640, 480);
-
         const float frameWidth = static_cast<float>(movie.CurrentFrame.width);
         const float frameHeight = static_cast<float>(movie.CurrentFrame.height);
-        const float targetWidth = 640.0f;
-        const float targetHeight = 480.0f;
+        const auto targetSize = target.GetSize();
+        const float targetWidth = static_cast<float>(targetSize.x);
+        const float targetHeight = static_cast<float>(targetSize.y);
         const float scale = std::min(targetWidth / frameWidth, targetHeight / frameHeight);
 
         Render::CanvasBitmapInfo info;
@@ -664,8 +663,11 @@ namespace Inferno {
         info.HorizontalAlign = AlignH::Center;
         info.VerticalAlign = AlignV::Center;
         info.Color = Color(1, 1, 1);
-        Render::BriefingCanvas->DrawBitmap(info);
-        Render::BriefingCanvas->Render(ctx, Render::Heaps->States.LinearClamp());
+        info.PointSample = false;
+
+        Render::Canvas->SetSize(targetSize.x, targetSize.y, targetSize.y);
+        Render::Canvas->DrawBitmap(info);
+        Render::Canvas->Render(ctx, Render::Heaps->States.LinearClamp());
 
         target.Transition(ctx.GetCommandList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     }
