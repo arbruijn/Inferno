@@ -508,16 +508,7 @@ namespace Inferno {
         }
 
         bool IsDismissPressed() {
-            return Input::MouseButtonPressed(Input::MouseButtons::LeftClick) ||
-                   Input::MouseButtonPressed(Input::MouseButtons::RightClick) ||
-                   Input::OnKeyPressed(Input::Keys::Space) ||
-                   Input::OnKeyPressed(Input::Keys::Escape) ||
-                   Input::OnKeyPressed(Input::Keys::Left) ||
-                   Input::OnKeyPressed(Input::Keys::Right) ||
-                   Input::MenuActions.IsSet(MenuAction::Confirm) ||
-                   Input::MenuActions.IsSet(MenuAction::Left) ||
-                   Input::MenuActions.IsSet(MenuAction::Right) ||
-                   Game::Bindings.Pressed(GameAction::Pause);
+            return Input::OnKeyPressed(Input::Keys::Escape);
         }
 
         void UploadFrame(GraphicsContext& ctx) {
