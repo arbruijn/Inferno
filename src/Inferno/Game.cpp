@@ -32,6 +32,7 @@
 #include "Resources.h"
 #include "SoundSystem.h"
 #include "VirtualFileSystem.h"
+#include "Psx/PsxXaAudio.h"
 
 using namespace DirectX;
 
@@ -978,8 +979,11 @@ namespace Inferno::Game {
                         Game::LoadLevel(hogPath, levelEntry, autosave); // Request a level load
 
                         if (showBriefing && !briefingName.empty()) {
-                            if (filesystem::exists(D1_FOLDER / "psx.bin") && ShowPsxMovie("DESCENT/INTRO.STR")) {
-                                // PSX movie replaces the text briefing when the disc image is available.
+                            if (mission.Name == Game::FIRST_STRIKE_NAME && levelNumber == 1 &&
+                                filesystem::exists(D1_FOLDER / "psx.bin") && ShowPsxMovie("DESCENT/INTRO.STR")) {
+                                //Psx::PlayXaAudio("DESCENT/WILBUR3.XA", 0);
+                                // show last screen
+                                //ShowBriefing(mission, levelNumber, level, briefingName, false, true);
                             }
                             else {
                                 ShowBriefing(mission, levelNumber, level, briefingName, false);

@@ -24,8 +24,8 @@
 namespace Inferno {
     namespace {
         constexpr float DEFAULT_MOVIE_FRAME_TIME = 1.0f / 15.0f * 1000.0f / 1001.0f;
-        constexpr std::size_t VIDEO_BUFFER_TARGET = 2;
-        constexpr std::size_t AUDIO_BUFFER_TARGET = 2;
+        constexpr std::size_t VIDEO_BUFFER_TARGET = 3;
+        constexpr std::size_t AUDIO_BUFFER_TARGET = 3;
         constexpr float MIN_ADAPTIVE_FRAME_TIME_SCALE = 1.0f;
         constexpr float MAX_ADAPTIVE_FRAME_TIME_SCALE = 1.5f;
         constexpr int AUDIO_QUEUE_CLEAR_FRAMES_BEFORE_PROBE = 8;
@@ -554,6 +554,15 @@ namespace Inferno {
         Movie().Stop();
     }
 
+    void PsxMovieSetNextState() {
+        //Game::SetState(GameState::LoadLevel);
+        auto mission = Game::GetCurrentMissionInfo();
+        if (mission) {
+            auto briefingName = mission->GetValue("briefing");
+            ShowBriefing(*mission, Game::LevelNumber, Game::Level, briefingName, false, true);
+        }
+    }
+
     void UpdatePsxMovie(float dt) {
         static int updates = 0;
         static int frames = 0;
@@ -593,7 +602,7 @@ namespace Inferno {
                     SPDLOG_WARN("PSX movie playback ended or failed: {}", error);
                 }
                 movie.Stop();
-                Game::SetState(GameState::LoadLevel);
+                PsxMovieSetNextState();
                 return;
             }
             printf("%.2f frame %d dt %.3f ft %.03f\n", totalTime, movie.lastFrameNum_, dt, currentFrameTime);
@@ -631,7 +640,7 @@ namespace Inferno {
         }
 
         StopPsxMovie();
-        Game::SetState(GameState::LoadLevel);
+        PsxMovieSetNextState();
     }
 
     void DrawPsxMovie(GraphicsContext& ctx, RenderTarget& target) {

@@ -27,6 +27,7 @@ namespace Inferno {
 
             for (auto& screen : briefing.Screens) {
                 if (isDescent1 && level == 1 && (screen.Level == 0 || screen.Level == 1)) {
+                printf("screen lvl %d lasts %d eg %d pages %zu have %zu arglvl %d\n", screen.Level, (int)lastScreenOnly, (int)endgame, screen.Pages.size(), _screens.size(), level);
                     // special case for D1 intro briefing show both level 0 and level 1
                     _screens.push_back(screen);
                     foundLevel = true;
@@ -45,6 +46,7 @@ namespace Inferno {
                 lastScreen.push_back(std::move(_screens.back()));
                 _screens = std::move(lastScreen);
             }
+            printf("got %zu\n", _screens.size());
 
             OnPageChanged(); // init animations
         }
