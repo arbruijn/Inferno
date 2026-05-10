@@ -268,7 +268,7 @@ vaporization of the facility.
         }
     }
 
-    void ShowBriefing(const MissionInfo& mission, int levelNumber, const Inferno::Level& level, string briefingName, bool endgame) {
+    void ShowBriefing(const MissionInfo& mission, int levelNumber, const Inferno::Level& level, string briefingName, bool endgame, bool lastScreenOnly) {
         if (!Game::Mission)
             return;
 
@@ -313,7 +313,7 @@ vaporization of the facility.
             Game::PlayMusic(music);
         }
 
-        Game::Briefing = BriefingState(briefing, levelNumber, level.IsDescent1(), endgame);
+        Game::Briefing = BriefingState(briefing, levelNumber, level.IsDescent1(), endgame, lastScreenOnly);
         LoadBriefingResources(Game::Briefing, LoadFlag::LevelType);
         Game::SetState(GameState::Briefing);
     }

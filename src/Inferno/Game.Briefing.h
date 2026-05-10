@@ -22,7 +22,7 @@ namespace Inferno {
     public:
         BriefingState() = default;
 
-        BriefingState(const Briefing& briefing, int level, bool isDescent1, bool endgame) : _endgame(endgame), IsDescent1(isDescent1)  {
+        BriefingState(const Briefing& briefing, int level, bool isDescent1, bool endgame, bool lastScreenOnly = false) : _endgame(endgame), IsDescent1(isDescent1)  {
             bool foundLevel = false;
 
             for (auto& screen : briefing.Screens) {
@@ -38,6 +38,12 @@ namespace Inferno {
                 else if (foundLevel) {
                     break; // stop after level number changes to skip test screens
                 }
+            }
+
+            if (lastScreenOnly && !_screens.empty()) {
+                List<Briefing::Screen> lastScreen;
+                lastScreen.push_back(std::move(_screens.back()));
+                _screens = std::move(lastScreen);
             }
 
             OnPageChanged(); // init animations
@@ -93,5 +99,5 @@ namespace Inferno {
     void AddPyroAndReactorPages(Briefing& briefing);
 
     // Changes the game state to show a briefing
-    void ShowBriefing(const MissionInfo& mission, int levelNumber, const Inferno::Level& level, string briefingName, bool endgame);
+    void ShowBriefing(const MissionInfo& mission, int levelNumber, const Inferno::Level& level, string briefingName, bool endgame, bool lastScreenOnly = false);
 }
