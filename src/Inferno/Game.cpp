@@ -154,7 +154,10 @@ namespace Inferno::Game {
             auto up = face.VectorForEdge(0);
             auto rotation = VectorToRotation(-face.AverageNormal(), -up);
             rotation.Forward(rotation.Backward()); // ugh reverse z
-            TeleportObject(GetPlayerObject(), tag.Segment, &seg->Center, &rotation);
+            auto facing = face.Center() - seg->Center;
+            facing.Normalize();
+            auto position = face.Center() - facing * 15;
+            TeleportObject(GetPlayerObject(), tag.Segment, &position, &rotation);
         }
     }
 

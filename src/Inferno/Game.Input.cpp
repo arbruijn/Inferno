@@ -3,6 +3,7 @@
 #include "Editor/Editor.h"
 #include "Game.Bindings.h"
 #include "Game.h"
+#include "Game.Object.h"
 #include "Game.Reactor.h"
 #include "Game.UI.h"
 #include "Resources.h"
@@ -78,6 +79,34 @@ namespace Inferno {
             }
         }
 
+        void PickUpAllPowerups() {
+            auto& player = Game::Player;
+
+            for (auto& obj : Game::Level.Objects) {
+                if (obj.Type != ObjectType::Powerup || !obj.IsAlive())
+                    continue;
+
+                player.TouchObject(obj);
+                obj.Lifespan = -1;
+            }
+        }
+
+        void DestroyAllRobots() {
+            for (auto& obj : Game::Level.Objects) {
+                if (obj.Type == ObjectType::Robot && obj.IsAlive())
+                    DestroyObject(obj);
+            }
+        }
+
+        void DestroyLevelReactor() {
+            for (auto& obj : Game::Level.Objects) {
+                if (obj.Type == ObjectType::Reactor && obj.IsAlive()) {
+                    Game::DestroyReactor(obj);
+                    break;
+                }
+            }
+        }
+
         bool TryApplyCheat(string_view code) {
             if (code == "GABBAGABBAHEY") {
                 EnableCheats();
@@ -122,6 +151,13 @@ namespace Inferno {
                             break;
                         }
                     }
+                }},
+                CheatEntry{ "DELSHIFTB", [] {
+                    DestroyAllRobots();
+                    PickUpAllPowerups();
+                    DestroyLevelReactor();
+                    Game::WarpPlayerToExit();
+                    Game::BeginSelfDestruct();
                 }},
                 CheatEntry{ "ASTRAL", [] {
                     Settings::Cheats.Ghost = true;
