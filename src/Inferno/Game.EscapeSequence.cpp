@@ -611,9 +611,14 @@ namespace Inferno {
             if (auto mission = Game::GetMissionInfo(*Game::Mission)) {
                 auto ending = mission->GetValue("ending");
 
-                if (!ending.empty())
+                if (mission->Name == Game::FIRST_STRIKE_NAME &&
+                    ShowPsxMovie("DESCENT/END.STR", []() {
+                        Game::SetState(GameState::ScoreScreen);
+                    })) {
+                    // nothing
+                } else if (!ending.empty()) {
                     ShowBriefing(*mission, Game::LevelNumber, Game::Level, ending, true);
-                else
+                } else
                     Game::SetState(GameState::ScoreScreen);
             }
         }
@@ -631,7 +636,7 @@ namespace Inferno {
             auto filename = std::string("DESCENT/") + lvl_exit_movie[Game::LevelNumber + 3] + ".STR";
             SPDLOG_WARN("filename {}", filename);
             if (ShowPsxMovie(filename, []() {
-                Game::SetState(GameState::ScoreScreen);
+                StopEscapeSequence();
                 })) {
                 return;
             }

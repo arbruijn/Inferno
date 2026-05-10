@@ -472,7 +472,7 @@ namespace Inferno::UI {
         int level = Game::LevelNumber > 0 ? Game::LevelNumber : 1;
         level = std::clamp(level, 1, (int)mission.Levels.size());
 
-        ShowLevelSelect(mission, level, [mission = std::move(mission)](int level) mutable {
+        ShowLevelSelect(mission, level, [mission](int level) mutable {
             Game::LoadLevelFromMission(mission, level, false);
         });
     }

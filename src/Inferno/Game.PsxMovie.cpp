@@ -609,12 +609,13 @@ namespace Inferno {
                 RunPsxMovieEndCallback();
                 return;
             }
-            printf("%.2f frame %d dt %.3f ft %.03f\n", totalTime, movie.lastFrameNum_, dt, currentFrameTime);
+            //printf("%.2f frame %d dt %.3f ft %.03f\n", totalTime, movie.lastFrameNum_, dt, currentFrameTime);
             movie.DrainQueuedAudioPackets();
         }
         movie.ReleaseCompletedAudioBuffers();
 
 
+        #if 0
         updates++;
                 char buf[128];
                 const auto queuedAudioSamples = movie.GetQueuedAudioSampleFrames();
@@ -632,6 +633,7 @@ namespace Inferno {
                     movie.lastFrameNum_, movie.PendingAudioPackets.size());
                      //movie.LiveAudioBuffers.size()); //movie.Audio->GetPendingBufferCount());
                  SetWindowTextA(GetActiveWindow(), buf);
+        #endif
     }
 
     void HandlePsxMovieInput() {
