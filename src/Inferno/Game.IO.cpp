@@ -13,6 +13,7 @@
 #include "Graphics.h"
 #include "Hog.IO.h"
 #include "LevelMetadata.h"
+#include "Psx/PsxXaAudio.h"
 #include "Procedural.h"
 #include "Resources.h"
 #include "SoundSystem.h"
@@ -608,6 +609,7 @@ namespace Inferno::Game {
 
     void PlayMusic(string_view song, LoadFlag priority, bool loop) {
         SPDLOG_INFO("Trying to play song `{}`", song);
+        Psx::StopXaAudio();
 
         //Sound::PlayMusic("Resignation.mp3");
         //Sound::PlayMusic("Title.ogg");

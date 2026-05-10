@@ -6,6 +6,7 @@
 #include "DirectX.h"
 #include "FileSystem.h"
 #include "Game.h"
+#include "Psx/PsxXaAudio.h"
 #include "logging.h"
 #include "Physics.h"
 #include "Resources.h"
@@ -1197,6 +1198,7 @@ namespace Inferno::Sound {
     }
 
     bool PlayMusic(const List<byte>&& data, bool loop) {
+        Psx::StopXaAudio();
         SoundThread->PlayMusic({ data, loop });
         return true;
     }
@@ -1204,10 +1206,12 @@ namespace Inferno::Sound {
 
     void StopMusic() {
         if (!SoundThread) return;
+        Psx::StopXaAudio();
         SoundThread->StopMusic();
     }
 
     void Shutdown() {
+        Psx::StopXaAudio();
         SoundThread.reset();
     }
 

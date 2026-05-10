@@ -64,6 +64,7 @@
     <ClCompile Include="OpenSimplex2.cpp" />
     <ClCompile Include="Physics.Capsule.cpp" />
     <ClCompile Include="Physics.cpp" />
+    <ClCompile Include="Psx\PsxXaAudio.cpp" />
     <ClCompile Include="Graphics\Render.Queue.cpp" />
     <ClCompile Include="Graphics\PostProcess.cpp" />
     <ClCompile Include="Procedural.cpp" />
@@ -201,6 +202,7 @@
     <ClInclude Include="Procedural.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="SoundTypes.h" />
+    <ClInclude Include="Psx\PsxXaAudio.h" />
     <ClInclude Include="unordered_dense.h" />
     <ClInclude Include="Version.h" />
     <ClInclude Include="WindowsDialogs.h" />

@@ -18,6 +18,7 @@
 #include "Graphics/Render.Briefing.h"
 #include "Psx/PsxIso9660.h"
 #include "Psx/PsxPlayback.h"
+#include "Psx/PsxXaAudio.h"
 #include "SoundSystem.h"
 
 namespace Inferno {
@@ -544,6 +545,7 @@ namespace Inferno {
         Game::BriefingVisible = false;
         PsxMovieVisible = true;
         Game::SetState(GameState::Briefing);
+        Psx::StopXaAudio();
         Sound::StopMusic();
         return true;
     }

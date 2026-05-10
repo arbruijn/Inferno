@@ -319,6 +319,7 @@
     <ClCompile Include="Psx\PsxIso9660.cpp" />
     <ClCompile Include="Psx\PsxMdec.cpp" />
     <ClCompile Include="Psx\PsxPlayback.cpp" />
+    <ClCompile Include="Psx\PsxXaAudio.cpp" />
     <ClCompile Include="Psx\PsxStream.cpp" />
     <ClCompile Include="Psx\PsxStr.cpp" />
     <ClCompile Include="Psx\PsxXa.cpp" />
@@ -508,6 +509,7 @@
       <FileType>HLSL</FileType>
     </None>
     <ClInclude Include="SoundTypes.h" />
+    <ClInclude Include="Psx\PsxXaAudio.h" />
     <ClInclude Include="Version.h" />
     <ClInclude Include="VertexTypes.h" />
     <ClInclude Include="WindowsDialogs.h" />
