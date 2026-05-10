@@ -263,6 +263,8 @@ vaporization of the facility.
         if (exitBriefing) {
             Game::BriefingVisible = false;
 
+            Psx::StopXaAudio();
+
             // the last level shows score screen after briefing
             auto state = Game::Briefing.IsEndgame() ? GameState::ScoreScreen : GameState::LoadLevel;
             Game::SetState(state);
@@ -318,10 +320,16 @@ vaporization of the facility.
         LoadBriefingResources(Game::Briefing, LoadFlag::LevelType);
         Game::SetState(GameState::Briefing);
         if (level.IsDescent1() && mission.Name == Game::FIRST_STRIKE_NAME) {
-            int psxNum = 3 + (levelNumber / 8);
-            int psxChan = levelNumber % 8;
-            auto psxName = psxNum <= 3 ? "WILBUR" + std::to_string(psxNum) : "MR_ED" + std::to_string(psxNum - 3);
-            Psx::PlayXaAudio("DESCENT/" + psxName + ".XA", psxChan);
+            // 1 * 8 .. 3 * 8 = wilbur1 .. 3, 4 * 8 .. 6 * 8 = mr_ed1 .. 3
+            int psxStreamNum = levelNumber < 9 ? 3 * 8 + levelNumber - 1 :
+                levelNumber == 9 ? 4 * 8 + 0 :
+                levelNumber == 10 ? 2 * 8 + 7 :
+                4 * 8 + 1 + levelNumber - 11;
+            int psxFileNum = psxStreamNum / 8;
+            int psxChan = psxStreamNum % 8;
+            SPDLOG_WARN("level {} stream {} file {} chan {}", levelNumber, psxStreamNum, psxFileNum, psxChan);
+            auto psxFileName = psxFileNum <= 3 ? "WILBUR" + std::to_string(psxFileNum) : "MR_ED" + std::to_string(psxFileNum - 3);
+            Psx::PlayXaAudio("DESCENT/" + psxFileName + ".XA", psxChan);
         }
     }
 }

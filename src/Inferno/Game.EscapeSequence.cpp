@@ -623,6 +623,20 @@ namespace Inferno {
     }
 
     void StartEscapeSequence(Tag start) {
+        static const char* lvl_exit_movie[] = { "E", "E", "E", 0, // secret
+            "F", "F", "F", "A", "A", "B", "B",
+            "C", "C", "C", "G", "F", "G", "G", "F", "G", "F", "G", "F", "F", "F", "G", "F", "G", "D", "D", "F" };
+        auto mission = Game::GetCurrentMissionInfo();
+        if (Game::Level.IsDescent1() && mission && mission->Name == Game::FIRST_STRIKE_NAME) {
+            auto filename = std::string("DESCENT/") + lvl_exit_movie[Game::LevelNumber + 3] + ".STR";
+            SPDLOG_WARN("filename {}", filename);
+            if (ShowPsxMovie(filename, []() {
+                Game::SetState(GameState::ScoreScreen);
+                })) {
+                return;
+            }
+        }
+    
         // Regenerate the escape path in case the level has multiple exit triggers
         if (!CreateEscapePath(Game::Level, Game::Terrain, start, true)) {
             SPDLOG_WARN("Unable to create escape path, skipping to score screen");
