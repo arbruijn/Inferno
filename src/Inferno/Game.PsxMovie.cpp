@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <fstream>
 #include <deque>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -66,6 +67,7 @@ namespace Inferno {
             bool Presenting = false;
             int lastFrameNum_ = 0;
             int submit_count = 0;
+            std::function<void()> OnEnded;
 
             bool SetupEmptyFrame() {
                 auto frame = Playback.PeekNextFrame();
@@ -529,9 +531,10 @@ namespace Inferno {
         }
     } // namespace
 
-    bool ShowPsxMovie(const std::string& filename) {
+    bool ShowPsxMovie(const std::string& filename, std::function<void()> onEnded) {
         auto& movie = Movie();
         movie.Stop();
+        movie.OnEnded = std::move(onEnded);
 
         std::string error;
         if (!movie.OpenMovieStream(filename, &error)) {
@@ -539,6 +542,7 @@ namespace Inferno {
                 SPDLOG_WARN("Unable to load PSX movie {}: {}", filename, error);
             }
             movie.Stop();
+            movie.OnEnded = {};
             return false;
         }
 
@@ -554,12 +558,12 @@ namespace Inferno {
         Movie().Stop();
     }
 
-    void PsxMovieSetNextState() {
-        //Game::SetState(GameState::LoadLevel);
-        auto mission = Game::GetCurrentMissionInfo();
-        if (mission) {
-            auto briefingName = mission->GetValue("briefing");
-            ShowBriefing(*mission, Game::LevelNumber, Game::Level, briefingName, false, true);
+    void RunPsxMovieEndCallback() {
+        auto& movie = Movie();
+        auto onEnded = std::move(movie.OnEnded);
+        movie.OnEnded = {};
+        if (onEnded) {
+            onEnded();
         }
     }
 
@@ -602,7 +606,7 @@ namespace Inferno {
                     SPDLOG_WARN("PSX movie playback ended or failed: {}", error);
                 }
                 movie.Stop();
-                PsxMovieSetNextState();
+                RunPsxMovieEndCallback();
                 return;
             }
             printf("%.2f frame %d dt %.3f ft %.03f\n", totalTime, movie.lastFrameNum_, dt, currentFrameTime);
@@ -640,7 +644,7 @@ namespace Inferno {
         }
 
         StopPsxMovie();
-        PsxMovieSetNextState();
+        RunPsxMovieEndCallback();
     }
 
     void DrawPsxMovie(GraphicsContext& ctx, RenderTarget& target) {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <string>
 
 namespace Inferno {
@@ -9,7 +10,7 @@ namespace Inferno {
     // True while a PSX STR movie is active and should be rendered instead of the briefing UI.
     inline bool PsxMovieVisible = false;
 
-    bool ShowPsxMovie(const std::string& filename);
+    bool ShowPsxMovie(const std::string& filename, std::function<void()> onEnded = {});
     void StopPsxMovie();
     void UpdatePsxMovie(float dt);
     void HandlePsxMovieInput();

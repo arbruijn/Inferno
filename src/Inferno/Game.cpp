@@ -980,10 +980,10 @@ namespace Inferno::Game {
 
                         if (showBriefing && !briefingName.empty()) {
                             if (mission.Name == Game::FIRST_STRIKE_NAME && levelNumber == 1 &&
-                                filesystem::exists(D1_FOLDER / "psx.bin") && ShowPsxMovie("DESCENT/INTRO.STR")) {
+                                filesystem::exists(D1_FOLDER / "psx.bin") && ShowPsxMovie("DESCENT/INTRO.STR", [mission, levelNumber, level, briefingName]() {
+                                    ShowBriefing(mission, levelNumber, level, briefingName, false, true);
+                                })) {
                                 //Psx::PlayXaAudio("DESCENT/WILBUR3.XA", 0);
-                                // show last screen
-                                //ShowBriefing(mission, levelNumber, level, briefingName, false, true);
                             }
                             else {
                                 ShowBriefing(mission, levelNumber, level, briefingName, false);
