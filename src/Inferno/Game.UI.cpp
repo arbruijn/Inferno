@@ -23,6 +23,7 @@ namespace Inferno::UI {
     namespace {
         bool CursorCaptured = false;
         bool InputCaptured = false;
+        bool OpenCheatWarpOnPause = false;
     }
 
     void CaptureCursor(bool capture) { CursorCaptured = capture; }
@@ -467,6 +468,15 @@ namespace Inferno::UI {
         });
     }
 
+    void ShowCheatWarpLevelSelect(MissionInfo mission) {
+        int level = Game::LevelNumber > 0 ? Game::LevelNumber : 1;
+        level = std::clamp(level, 1, (int)mission.Levels.size());
+
+        ShowLevelSelect(mission, level, [mission = std::move(mission)](int level) mutable {
+            Game::LoadLevelFromMission(mission, level, false);
+        });
+    }
+
     void ShowCheatWarpDialog() {
         auto mission = Game::GetCurrentMissionInfo();
         if (!mission) {
@@ -474,10 +484,14 @@ namespace Inferno::UI {
             return;
         }
 
-        int level = 1;
-        ShowLevelSelect(*mission, level, [mission = std::move(*mission)](int level) mutable {
-            Game::LoadLevelFromMission(mission, level, false);
-        });
+        auto state = Game::GetState();
+        if (state == GameState::Game || state == GameState::EscapeSequence || state == GameState::PhotoMode) {
+            OpenCheatWarpOnPause = true;
+            Game::SetState(GameState::PauseMenu);
+            return;
+        }
+
+        ShowCheatWarpLevelSelect(std::move(*mission));
     }
 
     class PlayD1Dialog : public DialogBase {
@@ -821,6 +835,12 @@ namespace Inferno::UI {
     void ShowPauseDialog() {
         Screens.clear();
         ShowScreen(make_unique<PauseMenu>());
+
+        if (OpenCheatWarpOnPause) {
+            OpenCheatWarpOnPause = false;
+            if (auto mission = Game::GetCurrentMissionInfo())
+                ShowCheatWarpLevelSelect(std::move(*mission));
+        }
     }
 
     void ShowScoreScreen(const ScoreInfo& score, bool secretLevel) {
