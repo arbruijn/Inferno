@@ -88,6 +88,7 @@ namespace Inferno::Input {
         };
 
         std::vector<InputEvent> _inputEventQueue;
+        std::string _textInputBuffer;
 
         void HandleInputEvents() {
             for (auto& event : _inputEventQueue) {
@@ -577,6 +578,29 @@ namespace Inferno::Input {
         _inputEventQueue.push_back({ type, static_cast<uint8_t>(keyCode), flags });
     }
 
+    void QueueTextInput(wchar_t ch) {
+        if (ch == L'\b') {
+            if (!_textInputBuffer.empty())
+                _textInputBuffer.pop_back();
+            return;
+        }
+
+        if (ch < 0 || ch > 0x7f)
+            return;
+
+        auto c = static_cast<char>(ch);
+        if (!std::isalpha((unsigned char)c))
+            return;
+
+        _textInputBuffer.push_back(static_cast<char>(std::toupper((unsigned char)c)));
+    }
+
+    std::string ConsumeTextInput() {
+        auto text = std::move(_textInputBuffer);
+        _textInputBuffer.clear();
+        return text;
+    }
+
     void Update(float dt) {
         Input::NextFrame(dt);
 
@@ -771,6 +795,7 @@ namespace Inferno::Input {
         _mouseButtons.Reset();
         //_controller.Reset();
         _inputEventQueue.clear();
+        _textInputBuffer.clear();
         MenuActions.Reset();
         Devices.ResetState();
         WheelDelta = 0;

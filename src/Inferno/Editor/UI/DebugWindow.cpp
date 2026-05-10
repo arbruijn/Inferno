@@ -148,6 +148,11 @@ namespace Inferno::Editor {
             }
             ImGui::SameLine();
             ImGui::Checkbox("Low shields", &Settings::Cheats.LowShields);
+            ImGui::Checkbox("Ghost mode", &Settings::Cheats.Ghost);
+            ImGui::SameLine();
+            ImGui::Checkbox("Lunacy", &Settings::Cheats.Lunacy);
+            ImGui::SameLine();
+            ImGui::Checkbox("Ahimsa", &Settings::Cheats.Ahimsa);
 
             ImGui::Combo("Ship wiggle", (int*)&Settings::Inferno.ShipWiggle, "Normal\0Reduced\0Off");
 

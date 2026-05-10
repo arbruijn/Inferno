@@ -4,6 +4,7 @@
 #include "Game.Bindings.h"
 #include "Game.h"
 #include "Game.Reactor.h"
+#include "Game.UI.h"
 #include "Resources.h"
 #include "Settings.h"
 #include "Editor/Events.h"
@@ -16,11 +17,186 @@
 namespace Inferno {
     using Keys = Input::Keys;
 
+    namespace {
+        struct CheatEntry {
+            std::string_view Code;
+            std::function<void()> Action;
+        };
+
+        void EnableCheats() {
+            if (Game::Cheater)
+                return;
+
+            Game::Cheater = true;
+            PrintHudMessage("cheats enabled");
+            Sound::Play2D({ SoundID::Cheater });
+        }
+
+        void GiveAllPrimaryWeapons() {
+            auto& player = Game::Player;
+            static constexpr std::array weapons = {
+                PrimaryWeaponIndex::Laser,
+                PrimaryWeaponIndex::Vulcan,
+                PrimaryWeaponIndex::Spreadfire,
+                PrimaryWeaponIndex::Plasma,
+                PrimaryWeaponIndex::Fusion,
+                /*PrimaryWeaponIndex::SuperLaser,
+                PrimaryWeaponIndex::Gauss,
+                PrimaryWeaponIndex::Helix,
+                PrimaryWeaponIndex::Phoenix,
+                PrimaryWeaponIndex::Omega*/
+            };
+
+            for (auto weapon : weapons) {
+                player.GiveWeapon(weapon);
+                player.PrimaryAmmo[(int)weapon] = player.Ship.Weapons[(int)weapon].Ammo;
+            }
+        }
+
+        void GiveScourgeWeapons() {
+            auto& player = Game::Player;
+            static constexpr std::array weapons = {
+                PrimaryWeaponIndex::Vulcan,
+                PrimaryWeaponIndex::Spreadfire,
+                PrimaryWeaponIndex::Plasma,
+                //SecondaryWeaponIndex::Concussion
+                //SecondaryWeaponIndex::Homing,
+                //SecondaryWeaponIndex::ProxMine
+            };
+
+            for (auto weapon : weapons) {
+                player.GiveWeapon(weapon);
+                player.PrimaryAmmo[(int)weapon] = player.Ship.Weapons[(int)weapon].Ammo;
+            }
+        }
+
+        void GiveAllSecondaryWeapons() {
+            auto& player = Game::Player;
+            for (int i = 0; i < 5 /*((int)SecondaryWeaponIndex::None*/; ++i) {
+                player.SecondaryWeapons |= (1 << i);
+                player.SecondaryAmmo[i] = (i == (int)SecondaryWeaponIndex::ProximityMine || i == (int)SecondaryWeaponIndex::SmartMine) ? 99 : 200;
+            }
+        }
+
+        bool TryApplyCheat(string_view code) {
+            if (code == "GABBAGABBAHEY") {
+                EnableCheats();
+                return true;
+            }
+
+            if (!Game::Cheater)
+                return false;
+
+            static const std::array cheats = {
+                CheatEntry{ "RACERX", [] {
+                    Settings::Cheats.Invulnerable = true;
+                    if (auto player = Game::Level.TryGetObject(Game::Player.Reference))
+                        Game::MakeInvulnerable(*player, -1, false);
+                }},
+                CheatEntry{ "MITZI", [] {
+                    Game::Player.SetPowerup(PowerupFlag::BlueKey, true);
+                    Game::Player.SetPowerup(PowerupFlag::GoldKey, true);
+                    Game::Player.SetPowerup(PowerupFlag::RedKey, true);
+                }},
+                CheatEntry{ "GUILE", [] {
+                    Settings::Cheats.Cloaked = true;
+                    if (auto player = Game::Level.TryGetObject(Game::Player.Reference))
+                        Game::CloakObject(*player, -1, false);
+                }},
+                CheatEntry{ "TWILIGHT", [] {
+                    Game::Player.Shields = MAX_SHIELDS;
+                }},
+                CheatEntry{ "FARMERJOE", [] {
+                    UI::ShowCheatWarpDialog();
+                }},
+                CheatEntry{ "BUGGIN", [] {
+                    Game::SetTimeScale(2.0f, 0.5f);
+                }},
+                CheatEntry{ "BRUIN", [] {
+                    Game::Player.GiveExtraLife(1);
+                }},
+                CheatEntry{ "BIOPSYTOYS", [] {
+                    for (auto& obj : Game::Level.Objects) {
+                        if (obj.Type == ObjectType::Reactor) {
+                            DestroyObject(obj);
+                            break;
+                        }
+                    }
+                }},
+                CheatEntry{ "ASTRAL", [] {
+                    Settings::Cheats.Ghost = true;
+                    PrintHudMessage("ghost mode");
+                }},
+                CheatEntry{ "LUNACY", [] {
+                    Settings::Cheats.Lunacy = true;
+                    PrintHudMessage("lunacy");
+                }},
+                CheatEntry{ "BIGRED", [] {
+                    GiveAllPrimaryWeapons();
+                    GiveAllSecondaryWeapons();
+                    Game::Player.Energy = MAX_ENERGY;
+                }},
+                CheatEntry{ "SCOURGE", [] {
+                    GiveScourgeWeapons();
+                }},
+                CheatEntry{ "PORGYS", [] {
+                    GiveAllPrimaryWeapons();
+                    GiveAllSecondaryWeapons();
+                    Game::Player.Energy = MAX_ENERGY;
+                    Game::Player.Shields = MAX_SHIELDS;
+                }},
+                CheatEntry{ "AHIMSA", [] {
+                    Settings::Cheats.Ahimsa = true;
+                    PrintHudMessage("robots will not shoot");
+                }},
+            };
+
+            for (auto& cheat : cheats) {
+                if (code == cheat.Code) {
+                    EnableCheats();
+                    cheat.Action();
+                    Sound::Play2D({ SoundID::Cheater });
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        void ProcessCheatCodes() {
+            auto typed = Input::ConsumeTextInput();
+            if (typed.empty())
+                return;
+
+            static std::string buffer;
+            constexpr size_t maxCodeLen = 13;
+
+            for (char ch : typed) {
+                if (!std::isalpha((unsigned char)ch))
+                    continue;
+
+                buffer.push_back((char)std::toupper((unsigned char)ch));
+                if (buffer.size() > maxCodeLen)
+                    buffer.erase(0, buffer.size() - maxCodeLen);
+
+                for (size_t len = std::min(buffer.size(), maxCodeLen); len > 0; --len) {
+                    auto code = string_view(buffer).substr(buffer.size() - len);
+                    if (TryApplyCheat(code))
+                        break;
+                }
+            }
+        }
+    }
+
     void CheckDeveloperHotkeys() {
+        auto state = Game::GetState();
+        if (state == GameState::Game)
+            ProcessCheatCodes();
+        else
+            Input::ConsumeTextInput();
+
         if (!Settings::Inferno.EnableDevHotkeys)
             return;
-
-        auto state = Game::GetState();
 
         if (state == GameState::Game) {
             if (Input::OnKeyPressed(Keys::Back) && Input::AltDown)

@@ -256,6 +256,9 @@ namespace Inferno {
         bool Invulnerable = false;
         bool Cloaked = false;
         bool LowShields = false;
+        bool Ghost = false;
+        bool Lunacy = false;
+        bool Ahimsa = false;
     };
 
     namespace Settings {

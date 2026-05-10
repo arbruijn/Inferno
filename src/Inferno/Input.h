@@ -442,6 +442,8 @@ namespace Inferno::Input {
     void SetMouseMode(MouseMode);
 
     void ProcessMessage(UINT message, WPARAM, LPARAM);
+    void QueueTextInput(wchar_t ch);
+    std::string ConsumeTextInput();
 
     std::string KeyToString(Keys key);
 

@@ -674,6 +674,9 @@ namespace Inferno {
     }
 
     bool Player::CanOpenDoor(const Wall& wall) const {
+        if (Settings::Cheats.Ghost)
+            return wall.Type == WallType::Door && !wall.HasFlag(WallFlag::DoorLocked);
+
         if (wall.Type != WallType::Door || wall.HasFlag(WallFlag::DoorLocked))
             return false;
 

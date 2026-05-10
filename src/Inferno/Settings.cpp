@@ -728,6 +728,12 @@ namespace Inferno {
         node["DisableAI"] << s.DisableAI;
         node["DisableWeaponDamage"] << s.DisableWeaponDamage;
         node["FullyLoaded"] << s.FullyLoaded;
+        node["Invulnerable"] << s.Invulnerable;
+        node["Cloaked"] << s.Cloaked;
+        node["LowShields"] << s.LowShields;
+        node["Ghost"] << s.Ghost;
+        node["Lunacy"] << s.Lunacy;
+        node["Ahimsa"] << s.Ahimsa;
     }
 
     CheatSettings LoadCheatSettings(ryml::NodeRef node) {
@@ -737,6 +743,12 @@ namespace Inferno {
         ReadValue2(node, "DisableAI", s.DisableAI);
         ReadValue2(node, "DisableWeaponDamage", s.DisableWeaponDamage);
         ReadValue2(node, "FullyLoaded", s.FullyLoaded);
+        ReadValue2(node, "Invulnerable", s.Invulnerable);
+        ReadValue2(node, "Cloaked", s.Cloaked);
+        ReadValue2(node, "LowShields", s.LowShields);
+        ReadValue2(node, "Ghost", s.Ghost);
+        ReadValue2(node, "Lunacy", s.Lunacy);
+        ReadValue2(node, "Ahimsa", s.Ahimsa);
         return s;
     }
 

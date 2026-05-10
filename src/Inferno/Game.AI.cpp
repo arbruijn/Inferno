@@ -105,6 +105,13 @@ namespace Inferno {
         return info.Difficulty[(int)Game::Difficulty];
     }
 
+    float GetRobotSpeed(const RobotInfo& info) {
+        auto speed = DifficultyInfo(info).Speed;
+        if (Settings::Cheats.Lunacy)
+            speed *= 1.5f;
+        return speed;
+    }
+
     uint CountNearbyAllies(const Object& robot, float range, bool inCombat = false) {
         uint allies = 0;
         auto range2 = range * range;
@@ -467,7 +474,7 @@ namespace Inferno {
         auto dir = point - robot.Position;
         dir.Normalize();
         auto& info = Resources::GetRobotInfo(robot);
-        ai.Velocity += dir * DifficultyInfo(info).Speed * scale;
+        ai.Velocity += dir * GetRobotSpeed(info) * scale;
     }
 
     constexpr float FAST_WEAPON_SPEED = 200;
@@ -595,6 +602,9 @@ namespace Inferno {
     }
 
     void FireRobotWeapon(Object& robot, AIRuntime& ai, const RobotInfo& robotInfo, Vector3 target, bool primary, bool blind, bool lead) {
+        if (Settings::Cheats.Ahimsa)
+            return;
+
         if (!primary && robotInfo.WeaponType2 == WeaponID::None) return; // no secondary set
 
         const auto weaponId = primary ? robotInfo.WeaponType : robotInfo.WeaponType2;
@@ -1021,6 +1031,9 @@ namespace Inferno {
     }
 
     void FireRobotPrimary(Object& robot, AIRuntime& ai, const RobotInfo& robotInfo, const NavPoint& target, bool blind) {
+        if (Settings::Cheats.Ahimsa)
+            return;
+
         ai.FireDelay = 0;
 
         // multishot: consume as many projectiles as possible based on burst count
@@ -1129,7 +1142,7 @@ namespace Inferno {
             }
         }
 
-        ai.Velocity += dir * DifficultyInfo(robotInfo).Speed * .25f;
+        ai.Velocity += dir * GetRobotSpeed(robotInfo) * .25f;
     }
 
     // Tries to move behind the target, adjusting the direction every few seconds
@@ -1179,7 +1192,7 @@ namespace Inferno {
         }
 
         // todo: check if hits wall
-        ai.Velocity += ai.StrafeDir * DifficultyInfo(robotInfo).Speed * 0.5f;
+        ai.Velocity += ai.StrafeDir * GetRobotSpeed(robotInfo) * 0.5f;
     }
 
     void BlindFireRoutine(Object& robot, AIRuntime& ai, const RobotInfo& robotInfo, float dt) {
@@ -1405,11 +1418,11 @@ namespace Inferno {
     void MoveTowardsDir(Object& robot, const Vector3& dir, float dt, float scale) {
         scale = std::min(1.0f, scale);
         auto& aiInfo = Resources::GetRobotInfo(robot);
-        Vector3 idealVel = dir * DifficultyInfo(aiInfo).Speed * scale;
+        Vector3 idealVel = dir * GetRobotSpeed(aiInfo) * scale;
         Vector3 deltaVel = idealVel - robot.Physics.Velocity;
         float deltaSpeed = deltaVel.Length();
         deltaVel.Normalize();
-        float maxDeltaVel = DifficultyInfo(aiInfo).Speed; // todo: new field. this is between 0.5 and 2 of the base velocity
+        float maxDeltaVel = GetRobotSpeed(aiInfo); // todo: new field. this is between 0.5 and 2 of the base velocity
         float maxDeltaSpeed = dt * maxDeltaVel * scale;
 
         if (deltaSpeed > maxDeltaSpeed)
@@ -1430,7 +1443,7 @@ namespace Inferno {
         // melee robots are slow resistant
         const auto maxSlow = robotInfo.Attack == AttackType::Melee && !robot.IsPhasing() ? MAX_SLOW_EFFECT / 3 : MAX_SLOW_EFFECT;
         float slowScale = slow > 0 ? 1 - maxSlow * slow / MAX_SLOW_TIME : 1;
-        float maxDeltaSpeed = dt * DifficultyInfo(robotInfo).Speed * slowScale;
+        float maxDeltaSpeed = dt * GetRobotSpeed(robotInfo) * slowScale;
 
         if (deltaSpeed > maxDeltaSpeed)
             robot.Physics.Velocity += deltaVel * maxDeltaSpeed * 2; // x2 so max velocity is actually reached
@@ -1438,7 +1451,7 @@ namespace Inferno {
             robot.Physics.Velocity = idealVel;
 
         auto speed = robot.Physics.Velocity.Length();
-        auto maxSpeed = DifficultyInfo(robotInfo).Speed;
+        auto maxSpeed = GetRobotSpeed(robotInfo);
         if (ai.State == AIState::FindHelp) maxSpeed *= 1.5f;
 
         if (speed > maxSpeed)
@@ -1817,6 +1830,9 @@ namespace Inferno {
         if (robotInfo.Attack == AttackType::Melee || robotInfo.Guns == 0)
             suppressChance = 0; // Melee robots can't shoot
 
+        if (Settings::Cheats.Lunacy)
+            suppressChance *= 0.25f;
+
         if (robot.Control.AI.Behavior == AIBehavior::Station)
             chaseChance *= 2; // patrolling robots twice as likely to chase
 
@@ -1849,6 +1865,11 @@ namespace Inferno {
         }
 
         if (roll < chaseChance + suppressChance) {
+            if (Settings::Cheats.Ahimsa) {
+                ChangeState(robot, ai, AIState::Alert);
+                return;
+            }
+
             ChangeState(robot, ai, AIState::BlindFire);
             return;
         }

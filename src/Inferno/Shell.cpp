@@ -221,7 +221,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 
         case WM_CHAR:
             if (wParam > 0 && wParam < 0x10000)
-                if (app) {}
+                Input::QueueTextInput((wchar_t)wParam);
             break;
     }
 

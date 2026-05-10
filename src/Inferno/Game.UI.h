@@ -9,4 +9,5 @@ namespace Inferno::UI {
 
     // missionFailed indicates the player ran out of lives
     void ShowFailedEscapeDialog(bool missionFailed);
+    void ShowCheatWarpDialog();
 }
