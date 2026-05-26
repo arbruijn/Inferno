@@ -755,15 +755,26 @@ namespace Inferno {
     public:
         UIShader(const ShaderInfo& info) : IShader(info) {
             InputLayout = CanvasVertex::Layout;
-            Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; // Draws directly to SRGB back buffer
+            Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; // Updated at runtime to match the active back buffer
         }
 
         static void SetDiffuse(ID3D12GraphicsCommandList* commandList, D3D12_GPU_DESCRIPTOR_HANDLE texture) {
             commandList->SetGraphicsRootDescriptorTable(Diffuse, texture);
         }
 
-        static void SetWorldViewProjection(ID3D12GraphicsCommandList* commandList, const Matrix& wvp) {
-            commandList->SetGraphicsRoot32BitConstants(Constants, sizeof(wvp) / 4, &wvp.m, 0);
+        struct ConstantsData {
+            Matrix WorldViewProjection = Matrix::Identity;
+            float HDRWhiteScale = 1;
+            float Pad0 = 0, Pad1 = 0, Pad2 = 0;
+        };
+
+        static void SetWorldViewProjection(ID3D12GraphicsCommandList* commandList, const Matrix& wvp, float hdrWhiteScale = 1) {
+            ConstantsData constants{
+                .WorldViewProjection = wvp,
+                .HDRWhiteScale = hdrWhiteScale
+            };
+
+            commandList->SetGraphicsRoot32BitConstants(Constants, sizeof(constants) / 4, &constants, 0);
         }
 
         static void SetSampler(ID3D12GraphicsCommandList* commandList, D3D12_GPU_DESCRIPTOR_HANDLE sampler) {

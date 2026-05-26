@@ -197,9 +197,20 @@ namespace Inferno::Graphics {
             Render::Adapter->CreateWindowSizeDependentResources(forceSwapChainRebuild);
     }
 
+    void ApplyDisplaySettings(bool forceSwapChainRebuild) {
+        if (!Render::Adapter)
+            return;
+
+        Render::Adapter->SetHDRMode(Settings::Graphics.EnableHDR);
+        Render::Adapter->SetBackBufferFormat(Render::GetBackBufferFormat());
+        Render::Adapter->CreateWindowSizeDependentResources(forceSwapChainRebuild);
+    }
+
     void ReloadResources() {
-        if (Render::Adapter)
+        if (Render::Adapter) {
             Render::Adapter->ReloadResources();
+            Render::ReloadOutputResources();
+        }
     }
 
     void ReloadTextures() {

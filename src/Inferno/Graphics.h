@@ -42,6 +42,7 @@ namespace Inferno::Graphics {
     span<RoomID> GetVisibleRooms();
 
     void CreateWindowSizeDependentResources(bool forceSwapChainRebuild);
+    void ApplyDisplaySettings(bool forceSwapChainRebuild = false);
 
     void ReloadResources();
 

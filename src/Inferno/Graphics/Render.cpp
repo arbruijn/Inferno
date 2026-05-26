@@ -28,6 +28,7 @@ using namespace Inferno::Graphics;
 
 namespace Inferno::Render {
     using VertexType = DirectX::VertexPositionTexture;
+    constexpr float SDRWhiteNits = 80.0f;
 
     Color ClearColor = { 0.1f, 0.1f, 0.1f, 1.0f };
     bool LevelChanged = false;
@@ -59,6 +60,19 @@ namespace Inferno::Render {
 
         //Inferno::Camera DEFAULT_CAMERA;
         //Inferno::Camera* pCam = &DEFAULT_CAMERA;
+
+        void CreateOutputDependentResources() {
+            ResourceUploadBatch resourceUpload(Device);
+            resourceUpload.Begin();
+
+            RenderTargetState rtState(Adapter->GetBackBufferFormat(), Adapter->SceneDepthBuffer.GetFormat());
+            SpriteBatchPipelineStateDescription pd(rtState);
+            pd.samplerDescriptor = Heaps->States.PointClamp();
+            _postBatch = make_unique<SpriteBatch>(Device, resourceUpload, pd);
+
+            auto task = resourceUpload.End(Adapter->GetCommandQueue());
+            task.wait();
+        }
     }
 
     //void SetCamera(Inferno::Camera& camera) {
@@ -192,9 +206,36 @@ namespace Inferno::Render {
         EndTextureUpload(batch, Render::Adapter->BatchUploadQueue->Get());
     }
 
+    DXGI_FORMAT GetBackBufferFormat() {
+        return Settings::Graphics.EnableHDR ? HDRBackBufferFormat : SDRBackBufferFormat;
+    }
+
+    unsigned int GetDeviceOptions() {
+        unsigned int options = DeviceResources::c_AllowTearing;
+        if (Settings::Graphics.EnableHDR)
+            options |= DeviceResources::c_EnableHDR;
+        return options;
+    }
+
+    bool IsHDROutputActive() {
+        return Adapter &&
+            Settings::Graphics.EnableHDR &&
+            Adapter->GetBackBufferFormat() == HDRBackBufferFormat &&
+            Adapter->IsDisplayHDR10();
+    }
+
+    float GetHDRPaperWhiteScale() {
+        return std::max(Settings::Graphics.HDRPaperWhiteNits / SDRWhiteNits, 1.0f);
+    }
+
+    void ReloadOutputResources() {
+        CreateOutputDependentResources();
+    }
+
     // Initialize device dependent objects here (independent of window size).
     void CreateDeviceDependentResources() {
         Shaders = make_unique<ShaderResources>();
+        Shaders->UserInterface.Format = Adapter->GetBackBufferFormat();
         Effects = make_unique<EffectResources>(Shaders.get());
         ToneMapping = make_unique<PostFx::ToneMapping>();
         MaterialInfoUploadBuffer = make_unique<UploadBuffer<GpuMaterialInfo>>(MATERIAL_COUNT, "Material upload buffer");
@@ -233,19 +274,7 @@ namespace Inferno::Render {
         g_ImGuiBatch = make_unique<ImGuiBatch>(Adapter->GetBackBufferCount());
 
         CreateEditorResources();
-        ResourceUploadBatch resourceUpload(Device);
-
-        resourceUpload.Begin();
-
-        {
-            RenderTargetState rtState(Adapter->GetBackBufferFormat(), Adapter->SceneDepthBuffer.GetFormat());
-            SpriteBatchPipelineStateDescription pd(rtState);
-            pd.samplerDescriptor = Heaps->States.PointClamp();
-            _postBatch = make_unique<SpriteBatch>(Device, resourceUpload, pd);
-        }
-
-        auto task = resourceUpload.End(Adapter->GetCommandQueue());
-        task.wait();
+        CreateOutputDependentResources();
     }
 
     void CreateWindowSizeDependentResources(int width, int height) {
@@ -255,7 +284,11 @@ namespace Inferno::Render {
     void Initialize(HWND hwnd, uint width, uint height) {
         assert(hwnd);
         _hwnd = hwnd;
-        Adapter = make_unique<DeviceResources>(BackBufferFormat);
+        Adapter = make_unique<DeviceResources>(GetBackBufferFormat(),
+                                               DXGI_FORMAT_D32_FLOAT_S8X24_UINT,
+                                               2,
+                                               D3D_FEATURE_LEVEL_11_0,
+                                               GetDeviceOptions());
         StaticTextures = make_unique<StaticTextureDef>();
         Adapter->SetWindow(hwnd, width, height);
         Adapter->CreateDeviceResources();

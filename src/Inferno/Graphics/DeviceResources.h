@@ -85,6 +85,13 @@ namespace Inferno {
         UINT GetBackBufferCount() const noexcept { return m_backBufferCount; }
         DXGI_COLOR_SPACE_TYPE GetColorSpace() const noexcept { return m_colorSpace; }
         unsigned int GetDeviceOptions() const noexcept { return m_options; }
+        bool IsDisplayHDR10() const noexcept { return m_isDisplayHDR10; }
+
+        void SetBackBufferFormat(DXGI_FORMAT format) noexcept { m_backBufferFormat = format; }
+        void SetHDRMode(bool enabled) noexcept {
+            if (enabled) m_options |= c_EnableHDR;
+            else m_options &= ~c_EnableHDR;
+        }
 
         // Both MSAA and normal render targets are necessary when using MSAA.
         // The MSAA buffers are resolved to normal sources before being drawn
@@ -214,6 +221,7 @@ namespace Inferno {
 
         // HDR Support
         DXGI_COLOR_SPACE_TYPE m_colorSpace;
+        bool m_isDisplayHDR10 = false;
 
         // DeviceResources options (see flags above)
         unsigned int m_options;

@@ -13,7 +13,8 @@ class CommandListManager;
 class ContextManager;
 
 namespace Inferno::Render {
-    constexpr DXGI_FORMAT BackBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+    constexpr DXGI_FORMAT SDRBackBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+    constexpr DXGI_FORMAT HDRBackBufferFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
     // Smart pointers in a namespace makes no sense as they will never trigger
     inline Ptr<ShaderResources> Shaders;
@@ -61,6 +62,12 @@ namespace Inferno::Render {
     void Resize(uint width, uint height);
     void Shutdown();
     void Present(const Camera& camera);
+    void ReloadOutputResources();
+
+    DXGI_FORMAT GetBackBufferFormat();
+    unsigned int GetDeviceOptions();
+    bool IsHDROutputActive();
+    float GetHDRPaperWhiteScale();
 
     //void RenderProbe(const Vector3& position);
 

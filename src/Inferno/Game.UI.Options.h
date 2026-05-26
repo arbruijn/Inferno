@@ -248,10 +248,12 @@ namespace Inferno::UI {
     class GraphicsMenu : public DialogBase {
         int _msaaSamples = 0;
         bool _useVsync;
+        bool _enableHdr;
+        float _hdrPaperWhiteNits;
 
     public:
         GraphicsMenu() : DialogBase("Graphics Options") {
-            Size = Vector2(620, 460);
+            Size = Vector2(620, 520);
             CloseOnConfirm = false;
 
             auto panel = AddChild<StackPanel>();
@@ -264,9 +266,19 @@ namespace Inferno::UI {
             panel->AddChild<Checkbox>("Fullscreen", Settings::Inferno.Fullscreen);
 
             _useVsync = Settings::Graphics.UseVsync;
+            _enableHdr = Settings::Graphics.EnableHDR;
+            _hdrPaperWhiteNits = Settings::Graphics.HDRPaperWhiteNits;
             panel->AddChild<Checkbox>("VSync", _useVsync);
+            panel->AddChild<Checkbox>("HDR output", _enableHdr);
             panel->AddChild<Checkbox>("Procedural textures", Settings::Graphics.EnableProcedurals);
             panel->AddChild<Checkbox>("Fog", Settings::Graphics.EnableFog);
+
+            auto hdrPaperWhite = panel->AddChild<SliderFloat>("HDR paper white", 80.0f, 400.0f, _hdrPaperWhiteNits, 0);
+            hdrPaperWhite->ShowValue = true;
+            hdrPaperWhite->LabelWidth = 250;
+            hdrPaperWhite->ValueWidth = 80;
+            hdrPaperWhite->Step = 10.0f;
+            hdrPaperWhite->BigStep = 20.0f;
 
             auto renderScale = panel->AddChild<SliderFloat>("Render scale", 0.05f, 1.0f, Settings::Graphics.RenderScale, 2);
             //renderScale->LabelWidth = 300;
@@ -333,16 +345,20 @@ namespace Inferno::UI {
                 }
             }();
 
-            if (msaaSamples != Settings::Graphics.MsaaSamples) {
-                Settings::Graphics.MsaaSamples = msaaSamples;
-                Graphics::ReloadResources();
-            }
+            bool msaaChanged = msaaSamples != Settings::Graphics.MsaaSamples;
+            bool vsyncChanged = _useVsync != Settings::Graphics.UseVsync;
+            bool hdrChanged = _enableHdr != Settings::Graphics.EnableHDR;
 
-            if (_useVsync != Settings::Graphics.UseVsync) {
-                Settings::Graphics.UseVsync = _useVsync;
-                // Recreate the swap chain if vsync changes
-                Graphics::CreateWindowSizeDependentResources(true);
-            }
+            Settings::Graphics.MsaaSamples = msaaSamples;
+            Settings::Graphics.UseVsync = _useVsync;
+            Settings::Graphics.EnableHDR = _enableHdr;
+            Settings::Graphics.HDRPaperWhiteNits = _hdrPaperWhiteNits;
+
+            if (vsyncChanged || hdrChanged)
+                Graphics::ApplyDisplaySettings(vsyncChanged);
+
+            if (msaaChanged || hdrChanged)
+                Graphics::ReloadResources();
         }
     };
 

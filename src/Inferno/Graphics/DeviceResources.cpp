@@ -472,6 +472,7 @@ namespace Inferno {
             if (!m_dxgiFactory->IsCurrent()) {
                 // Output information is cached on the DXGI Factory. If it is stale we need to create a new factory.
                 ThrowIfFailed(CreateDXGIFactory2(m_dxgiFactoryFlags, IID_PPV_ARGS(m_dxgiFactory.ReleaseAndGetAddressOf())));
+                UpdateColorSpace();
             }
         }
 
@@ -501,6 +502,9 @@ namespace Inferno {
 
             auto width = m_outputSize.right;
             auto height = m_outputSize.bottom;
+
+            if (Render::Shaders)
+                Render::Shaders->UserInterface.Format = m_backBufferFormat;
 
             Render::Effects->Compile(m_d3dDevice.Get(), Settings::Graphics.MsaaSamples);
             Scanline.Load("shaders/ScanlineCS.hlsl");
@@ -595,9 +599,11 @@ namespace Inferno {
 
     // Sets the color space for the swap chain in order to handle HDR output.
     void DeviceResources::UpdateColorSpace() {
-        DXGI_COLOR_SPACE_TYPE colorSpace = DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709;
+        DXGI_COLOR_SPACE_TYPE colorSpace = m_backBufferFormat == DXGI_FORMAT_R16G16B16A16_FLOAT
+            ? DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709
+            : DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709;
 
-        bool isDisplayHDR10 = false;
+        m_isDisplayHDR10 = false;
 
 #if defined(NTDDI_WIN10_RS2)
         if (m_swapChain) {
@@ -610,14 +616,14 @@ namespace Inferno {
 
                     if (desc.ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020) {
                         // Display output is HDR10.
-                        isDisplayHDR10 = true;
+                        m_isDisplayHDR10 = true;
                     }
                 }
             }
         }
 #endif
 
-        if ((m_options & c_EnableHDR) && isDisplayHDR10) {
+        if ((m_options & c_EnableHDR) && m_isDisplayHDR10) {
             switch (m_backBufferFormat) {
                 case DXGI_FORMAT_R10G10B10A2_UNORM:
                     // The application creates the HDR10 signal.
@@ -625,7 +631,7 @@ namespace Inferno {
                     break;
 
                 case DXGI_FORMAT_R16G16B16A16_FLOAT:
-                    // The system creates the HDR10 signal; application uses linear values.
+                    // The system creates the HDR10 signal; the application writes linear scRGB values.
                     colorSpace = DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709;
                     break;
 

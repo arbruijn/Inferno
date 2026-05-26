@@ -166,6 +166,7 @@ namespace Inferno {
     struct GraphicsSettings {
         bool HighRes = false; // Enables high res textures and filtering
         bool EnableBloom = true; // Enables bloom post-processing and tone mapping
+        bool EnableHDR = false; // Enables HDR-capable swap chain output when supported by the current display
         bool EnableProcedurals = true;
         bool EnableFog = true;
         int MsaaSamples = 1; // 1 through 8. 1 is no MSAA
@@ -180,6 +181,7 @@ namespace Inferno {
         float FieldOfView = 70; // Game FOV in degrees. Descent uses 60, but a higher value feels better for input.
         float RenderScale = 1; // Scale of 3D render target
         float Brightness = 1;
+        float HDRPaperWhiteNits = 200.0f; // Diffuse white level for SDR UI/content on HDR displays
 
         // Debugging
 

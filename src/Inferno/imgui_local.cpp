@@ -341,7 +341,7 @@ namespace Inferno {
         ctx->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
         Render::Adapter->GetGraphicsContext().ApplyEffect(Render::Effects->UserInterface);
-        Render::Shaders->UserInterface.SetWorldViewProjection(ctx, proj);
+        Render::Shaders->UserInterface.SetWorldViewProjection(ctx, proj, Render::IsHDROutputActive() ? Render::GetHDRPaperWhiteScale() : 1.0f);
         Render::Shaders->UserInterface.SetSampler(ctx, Render::Heaps->States.LinearClamp());
 
         // Setup blend factor

@@ -7,8 +7,12 @@
 #include "Game.Text.h"
 #include "MaterialLibrary.h"
 #include "SystemClock.h"
+#include <type_traits>
 
 namespace Inferno::Render {
+    bool IsHDROutputActive();
+    float GetHDRPaperWhiteScale();
+
     Vector2 GetAlignment(const Vector2& size, AlignH alignH, AlignV alignV, const Vector2& parentSize, const Vector2& margin = Vector2::Zero);
 
     struct StaticTextureDef {
@@ -158,10 +162,14 @@ namespace Inferno::Render {
         // Dispatches the batched draw commands
         void Render(GraphicsContext& ctx, D3D12_GPU_DESCRIPTOR_HANDLE sampler = Heaps->States.PointClamp()) {
             auto orthoProj = Matrix::CreateOrthographicOffCenter(0, _size.x, _size.y, 0.0, 0.0, -2.0f);
+            float hdrWhiteScale = 1.0f;
+
+            if constexpr (std::is_same_v<TShader, UIShader>)
+                hdrWhiteScale = Render::IsHDROutputActive() ? Render::GetHDRPaperWhiteScale() : 1.0f;
 
             auto cmdList = ctx.GetCommandList();
             ctx.ApplyEffect(*_effect);
-            _effect->Shader->SetWorldViewProjection(cmdList, orthoProj);
+            _effect->Shader->SetWorldViewProjection(cmdList, orthoProj, hdrWhiteScale);
             _effect->Shader->SetSampler(cmdList, sampler);
 
             for (auto& layer : _commands) {

@@ -33,6 +33,7 @@ namespace Inferno {
         node |= ryml::MAP;
         node["HighRes"] << s.HighRes;
         node["EnableBloom"] << s.EnableBloom;
+        node["EnableHDR"] << s.EnableHDR;
         node["MsaaSamples"] << s.MsaaSamples;
         node["EnableForegroundFpsLimit"] << s.EnableForegroundFpsLimit;
         node["ForegroundFpsLimit"] << s.ForegroundFpsLimit;
@@ -44,6 +45,7 @@ namespace Inferno {
         node["FieldOfView"] << s.FieldOfView;
         node["Brightness"] << s.Brightness;
         node["RenderScale"] << s.RenderScale;
+        node["HDRPaperWhiteNits"] << s.HDRPaperWhiteNits;
     }
 
     GraphicsSettings LoadGraphicsSettings(ryml::NodeRef node) {
@@ -51,6 +53,7 @@ namespace Inferno {
         if (node.is_seed()) return s;
         ReadValue(node["HighRes"], s.HighRes);
         ReadValue(node["EnableBloom"], s.EnableBloom);
+        ReadValue(node["EnableHDR"], s.EnableHDR);
         ReadValue(node["MsaaSamples"], s.MsaaSamples);
         if (s.MsaaSamples != 1 && s.MsaaSamples != 2 && s.MsaaSamples != 4 && s.MsaaSamples != 8)
             s.MsaaSamples = 1;
@@ -68,6 +71,8 @@ namespace Inferno {
 
         ReadValue(node["Brightness"], s.Brightness);
         ReadValue(node["RenderScale"], s.RenderScale);
+        ReadValue(node["HDRPaperWhiteNits"], s.HDRPaperWhiteNits);
+        s.HDRPaperWhiteNits = std::clamp(s.HDRPaperWhiteNits, 80.0f, 400.0f);
 
         s.ForegroundFpsLimit = std::max(s.ForegroundFpsLimit, 20);
         return s;

@@ -203,6 +203,18 @@ namespace Inferno::Editor {
             ImGui::Checkbox("##Bloom", &_graphics.EnableBloom);
             ImGui::NextColumn();
 
+            ImGui::ColumnLabelEx("HDR output", "Uses an HDR-capable FP16 swap chain.\nAutomatically falls back to SDR tone mapping when the current display is not in HDR mode.");
+            ImGui::Checkbox("##HDR", &_graphics.EnableHDR);
+            ImGui::NextColumn();
+
+            ImGui::ColumnLabelEx("HDR paper white", "Diffuse white level for SDR UI and scene content on HDR displays.\n200 nits is a reasonable default for desktop HDR monitors.");
+            ImGui::SetNextItemWidth(-1);
+            {
+                DisableControls disable(!_graphics.EnableHDR);
+                ImGui::SliderFloat("##hdrpaperwhite", &_graphics.HDRPaperWhiteNits, 80.0f, 400.0f, "%.0f nits");
+            }
+            ImGui::NextColumn();
+
             ImGui::ColumnLabel("Wireframe opacity");
             ImGui::SetNextItemWidth(-1);
             ImGui::SliderFloat("##wfopacity", &_editor.WireframeOpacity, 0, 1, "%.2f");
@@ -507,6 +519,7 @@ namespace Inferno::Editor {
 
         bool resourcesChanged = false;
         bool vsyncChanged = false;
+        bool hdrChanged = _graphics.EnableHDR != Settings::Graphics.EnableHDR;
         auto dataPathsChanged = _inferno.DataPaths != Settings::Inferno.DataPaths;
         if (dataPathsChanged || _inferno.Descent1Path != Settings::Inferno.Descent1Path || _inferno.Descent2Path != Settings::Inferno.Descent2Path) {
             resourcesChanged = true;
@@ -536,8 +549,8 @@ namespace Inferno::Editor {
         Settings::Save();
         Events::SettingsChanged();
 
-        if (vsyncChanged) {
-            Graphics::CreateWindowSizeDependentResources(true);
+        if (vsyncChanged || hdrChanged) {
+            Graphics::ApplyDisplaySettings(vsyncChanged);
         }
 
         if (resourcesChanged) {
@@ -545,6 +558,9 @@ namespace Inferno::Editor {
             Resources::LoadLevel(Game::Level);
             Graphics::LoadLevel(Game::Level);
             Graphics::LoadLevelTextures(Game::Level, true);
+            Graphics::ReloadResources();
+        }
+        else if (hdrChanged) {
             Graphics::ReloadResources();
         }
 

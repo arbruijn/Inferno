@@ -10,7 +10,7 @@
 //
 // Author:  James Stanard 
 // 
-// HDR input with Typed UAV loads (32 bit -> 24 bit assignment) to a SDR output
+// HDR input with Typed UAV loads (32 bit -> 24 bit assignment) to SDR or HDR display output
 
 #include "Utility.hlsli"
 
@@ -55,9 +55,11 @@ struct Constants {
     int ToneMapper;
     bool EnableDirt;
     bool EnableBloom;
+    bool OutputHDR;
     float4 Tint;
     float Brightness;
-    float pad0, pad1, pad2;
+    float HDRPaperWhite;
+    float pad0, pad1;
 };
 
 ConstantBuffer<Constants> Args : register(b0);
@@ -159,6 +161,13 @@ float3 AdjustTint(float3 color, float3 mapBlackTo, float3 mapWhiteTo, float amou
     return lerp(color, lerp(mapBlackTo, mapWhiteTo, luminance), amount);
 }
 
+float3 ApplyHDRCurve(float3 color, float paperWhite, float peakWhite) {
+    float3 scaled = max(color, 0.0f) * paperWhite;
+    float3 highlights = max(scaled - paperWhite, 0.0f);
+    float shoulder = max(peakWhite - paperWhite, 0.0001f);
+    return min(scaled, paperWhite) + shoulder * highlights / (highlights + shoulder);
+}
+
 [RootSignature(RS)]
 [numthreads(8, 8, 1)]
 void main(uint3 DTid : SV_DispatchThreadID) {
@@ -183,8 +192,8 @@ void main(uint3 DTid : SV_DispatchThreadID) {
     hdrColor *= Args.Exposure;
 
     float3 sdrColor = hdrColor;
+    float3 displayColor = hdrColor;
 
-    // Tone map to SDR
     if (Args.NewLightMode) {
         const float3 whitepoint = float3(0.75, 1.5, 0.75);
 
@@ -198,6 +207,15 @@ void main(uint3 DTid : SV_DispatchThreadID) {
             //hdrColor += max(1 - (1 - abs(hdrColor)) / (Args.Tint.rgb * abs(Args.Tint.a)), 0);
             //hdrColor += max(hdrColor + Args.Tint.rgb * Args.Tint.a - 1, 0);
         }
+    }
+
+    if (Args.OutputHDR) {
+        const float peakWhite = 12.5f; // 1000 nits in scRGB
+        displayColor = ApplyHDRCurve(hdrColor, Args.HDRPaperWhite, peakWhite);
+    }
+    else if (Args.NewLightMode) {
+        // Tone map to SDR
+        const float3 whitepoint = float3(0.75, 1.5, 0.75);
 
         switch (Args.ToneMapper) {
             case 0:
@@ -234,11 +252,11 @@ void main(uint3 DTid : SV_DispatchThreadID) {
         //}
     }
 
-    sdrColor = GammaRamp(sdrColor, Args.Brightness);
+    displayColor = GammaRamp(Args.OutputHDR ? displayColor : sdrColor, Args.Brightness);
 
 #if SUPPORT_TYPED_UAV_LOADS
-    ColorRW[DTid.xy] = sdrColor;
+    ColorRW[DTid.xy] = displayColor;
 #else
-    DstColor[DTid.xy] = Pack_R11G11B10_FLOAT(sdrColor);
+    DstColor[DTid.xy] = Pack_R11G11B10_FLOAT(displayColor);
 #endif
 }

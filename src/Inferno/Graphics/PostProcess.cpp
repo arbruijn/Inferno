@@ -161,9 +161,11 @@ namespace Inferno::PostFx {
             int32 ToneMapper;
             HlslBool EnableDirt;
             HlslBool EnableBloom;
+            HlslBool OutputHDR;
             Color Tint;
             float Brightness = 1;
-            float pad0, pad1, pad2;
+            float HDRPaperWhite = 1;
+            float pad0, pad1;
         };
 
         Color screenTint = Game::ScreenGlow;
@@ -188,8 +190,10 @@ namespace Inferno::PostFx {
             .ToneMapper = Settings::Graphics.ToneMapper,
             .EnableDirt = (HlslBool)(dirt && enableDirt),
             .EnableBloom = (HlslBool)Settings::Graphics.EnableBloom,
+            .OutputHDR = (HlslBool)Render::IsHDROutputActive(),
             .Tint = tint,
-            .Brightness = Settings::Graphics.Brightness
+            .Brightness = Settings::Graphics.Brightness,
+            .HDRPaperWhite = Render::GetHDRPaperWhiteScale()
         };
 
         commandList->SetPipelineState(_pso.Get());
