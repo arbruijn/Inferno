@@ -192,7 +192,6 @@ void main(uint3 DTid : SV_DispatchThreadID) {
     hdrColor *= Args.Exposure;
 
     float3 sdrColor = hdrColor;
-    float3 displayColor = hdrColor;
 
     if (Args.NewLightMode) {
         const float3 whitepoint = float3(0.75, 1.5, 0.75);
@@ -208,6 +207,8 @@ void main(uint3 DTid : SV_DispatchThreadID) {
             //hdrColor += max(hdrColor + Args.Tint.rgb * Args.Tint.a - 1, 0);
         }
     }
+
+    float3 displayColor = sdrColor;
 
     if (Args.OutputHDR) {
         const float peakWhite = 12.5f; // 1000 nits in scRGB
@@ -250,9 +251,11 @@ void main(uint3 DTid : SV_DispatchThreadID) {
         //    float3 mapWhiteTo = pow(Args.Tint.rgb * 1, 2.2);
         //    sdrColor = AdjustTint(sdrColor, mapBlackTo, mapWhiteTo, saturate(Args.Tint.a));
         //}
+
+        displayColor = sdrColor;
     }
 
-    displayColor = GammaRamp(Args.OutputHDR ? displayColor : sdrColor, Args.Brightness);
+    displayColor = GammaRamp(displayColor, Args.Brightness);
 
 #if SUPPORT_TYPED_UAV_LOADS
     ColorRW[DTid.xy] = displayColor;

@@ -201,9 +201,12 @@ namespace Inferno::Graphics {
         if (!Render::Adapter)
             return;
 
+        bool hdrModeChanged = ((Render::Adapter->GetDeviceOptions() & DeviceResources::c_EnableHDR) != 0) != Settings::Graphics.EnableHDR;
+        bool backBufferFormatChanged = Render::Adapter->GetBackBufferFormat() != Render::GetBackBufferFormat();
+
         Render::Adapter->SetHDRMode(Settings::Graphics.EnableHDR);
         Render::Adapter->SetBackBufferFormat(Render::GetBackBufferFormat());
-        Render::Adapter->CreateWindowSizeDependentResources(forceSwapChainRebuild);
+        Render::Adapter->CreateWindowSizeDependentResources(forceSwapChainRebuild || hdrModeChanged || backBufferFormatChanged);
     }
 
     void ReloadResources() {
