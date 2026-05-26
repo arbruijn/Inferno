@@ -207,7 +207,15 @@ namespace Inferno::Render {
     }
 
     DXGI_FORMAT GetBackBufferFormat() {
-        return Settings::Graphics.EnableHDR ? HDRBackBufferFormat : SDRBackBufferFormat;
+        if (!Settings::Graphics.EnableHDR)
+            return SDRBackBufferFormat;
+
+        // Only use the HDR swap chain format when the current output is actually HDR.
+        // On SDR outputs the FP16 presentation path appears darker than the standard SDR swap chain.
+        if (Adapter && !Adapter->IsDisplayHDR10())
+            return SDRBackBufferFormat;
+
+        return HDRBackBufferFormat;
     }
 
     unsigned int GetDeviceOptions() {

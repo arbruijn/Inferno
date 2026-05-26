@@ -350,6 +350,18 @@ namespace Inferno {
         // Handle color space settings for HDR
         UpdateColorSpace();
 
+        DXGI_FORMAT desiredBackBufferFormat = m_backBufferFormat;
+        if (m_options & c_EnableHDR)
+            desiredBackBufferFormat = m_isDisplayHDR10 ? Render::HDRBackBufferFormat : Render::SDRBackBufferFormat;
+
+        // Display HDR state is only known after DXGI resolves the current output. Rebuild the
+        // swap chain once if the requested HDR mode does not match the active display capability.
+        if (desiredBackBufferFormat != m_backBufferFormat) {
+            m_backBufferFormat = desiredBackBufferFormat;
+            CreateWindowSizeDependentResources(true);
+            return;
+        }
+
         // Obtain the back buffers for this window which will be the final render targets
         // and create render target views for each of them.
         for (UINT n = 0; n < m_backBufferCount; n++) {
