@@ -55,11 +55,11 @@ struct Constants {
     int ToneMapper;
     bool EnableDirt;
     bool EnableBloom;
-    bool OutputHDR;
     float4 Tint;
     float Brightness;
     float HDRPaperWhite;
-    float pad0, pad1;
+    bool OutputHDR;
+    float pad0;
 };
 
 ConstantBuffer<Constants> Args : register(b0);
