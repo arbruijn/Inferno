@@ -4,6 +4,7 @@
 #include "Resources.h"
 #include "Game.UI.Bindings.h"
 #include "Shell.h"
+#include "WindowsDialogs.h"
 
 namespace Inferno::UI {
     ScreenBase* ShowScreen(Ptr<ScreenBase> screen);
@@ -353,6 +354,13 @@ namespace Inferno::UI {
             Settings::Graphics.UseVsync = _useVsync;
             Settings::Graphics.EnableHDR = _enableHdr;
             Settings::Graphics.HDRPaperWhiteNits = _hdrPaperWhiteNits;
+
+            if (hdrChanged && _enableHdr && !Graphics::IsHDROutputSupported()) {
+                ShowWarningMessage(
+                    "HDR output is enabled, but the current display does not support HDR.\n"
+                    "The game will fall back to SDR tone mapping.",
+                    "HDR output");
+            }
 
             if (vsyncChanged || hdrChanged)
                 Graphics::ApplyDisplaySettings(vsyncChanged);

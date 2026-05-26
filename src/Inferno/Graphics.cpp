@@ -50,6 +50,10 @@ namespace Inferno::Graphics {
         Render::Adapter->PrintMemoryUsage();
     }
 
+    bool IsHDROutputSupported() {
+        return Render::Adapter && Render::Adapter->IsDisplayHDR10();
+    }
+
     uint64 GetMaterialGpuPtr(TexID id) {
         return Render::Materials->Get(id).Pointer();
     }

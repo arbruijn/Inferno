@@ -549,6 +549,13 @@ namespace Inferno::Editor {
         Settings::Save();
         Events::SettingsChanged();
 
+        if (hdrChanged && _graphics.EnableHDR && !Graphics::IsHDROutputSupported()) {
+            ShowWarningMessage(
+                "HDR output is enabled, but the current display does not support HDR.\n"
+                "The game will fall back to SDR tone mapping.",
+                "HDR output");
+        }
+
         if (vsyncChanged || hdrChanged) {
             Graphics::ApplyDisplaySettings(vsyncChanged);
         }

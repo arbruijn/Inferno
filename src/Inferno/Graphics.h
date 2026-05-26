@@ -30,6 +30,7 @@ namespace Inferno::Graphics {
     ModelID LoadOutrageModel(const string& path);
 
     void PrintMemoryUsage();
+    bool IsHDROutputSupported();
 
     // Returns the diffuse GPU material pointer
     uint64 GetMaterialGpuPtr(TexID id);
